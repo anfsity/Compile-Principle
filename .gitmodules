@@ -1,0 +1,7 @@
+[submodule "Compiler-Principles-2024Fall-PKU"]
+	path = ./Compiler-Principles-2024Fall-PKU
+	url = git@github.com:zhuozhiyongde/Compiler-Principles-2024Fall-PKU.git
+
+[submodule "online-doc"]
+    path = online-doc
+    url = https://github.com/pku-minic/online-doc.git
