@@ -1,0 +1,57 @@
+/*  https://pku-minic.github.io/online-doc/#/lv1-main/lexer-parser */
+%option noyywrap
+%option nounput
+%option noinput
+
+/*
+CompUnit  ::= FuncDef;
+
+FuncDef   ::= FuncType IDENT "(" ")" Block;
+FuncType  ::= "int";
+
+Block     ::= "{" Stmt "}";
+Stmt      ::= "return" Number ";";
+Number    ::= INT_CONST;
+ */
+
+%{
+#include <string>
+#include <cstdlib>
+#include "sysy.tab.hpp"
+%}
+
+/* White space and comment */
+WhiteSpace [ \t\n\r]*
+LineComment "//".*
+%x MultiLineComment
+/* identifier */
+Identifier [a-zA-Z_][a-zA-Z0-9_]*
+
+/* integer literal */
+Decimal [1-9][0-9]*
+Octal 0[0-7]*
+Hexadecimal 0[xX][0-9a-fA-F]+
+
+%%
+{WhiteSpace}        {}
+{LineComment}       {}
+
+"/*"                { BEGIN(MultiLineComment); }
+<MultiLineComment>{
+    "*/"            { BEGIN(INITIAL); } /* return to initialize state */
+    [^*\n]+         { /* ignore chars that not * and not newline */ }
+    "*"             { /* ignore single * */ }
+    \n              { /* ignore newline */ }
+}
+
+"int"               { return INT; }
+"return"            { return RETURN; }
+
+{Identifier}        { yylval.str_val = new std::string(yytext); return IDENT; }
+
+{Decimal}           { yylval.int_val = std::strtol(yytext, nullptr, 0); return INT_CONST; }
+{Octal}             { yylval.int_val = std::strtol(yytext, nullptr, 0); return INT_CONST; }
+{Hexadecimal}       { yylval.int_val = std::strtol(yytext, nullptr, 0); return INT_CONST; }
+
+.                   { return yytext[0]; }
+%%
