@@ -8,6 +8,15 @@ set(INC_DIR "$ENV{CDE_INCLUDE_PATH}" CACHE STRING "directory of includes")
 message(STATUS "Library directory: ${LIB_DIR}")
 message(STATUS "Include directory: ${INC_DIR}")
 
+# library fmt
+include(FetchContent)
+FetchContent_Declare(
+    fmt
+    GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+    GIT_TAG         12.1.0
+)
+FetchContent_MakeAvailable(fmt)
+
 # require flex/bison
 find_package(FLEX REQUIRED)
 find_package(BISON REQUIRED)
@@ -39,10 +48,13 @@ target_include_directories(compiler PRIVATE
     ${INC_DIR}
 )
 
+# link libraries
 target_link_libraries(compiler PRIVATE
     koopa
     pthread
     dl
+    fmt::fmt
 )
 
+# complie options
 target_compile_options(compiler PRIVATE -Wall -Wno-register -Wextra)
