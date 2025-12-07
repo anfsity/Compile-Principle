@@ -35,7 +35,7 @@ endif()
 # project link directories
 link_directories(${LIB_DIR})
 
-set(CXX_SOURCES main.cpp)
+set(CXX_SOURCES main.cpp ast.cpp)
 set(SOURCES ${CXX_SOURCES}
 ${FLEX_Lexer_OUTPUTS} ${BISON_Parser_OUTPUT_SOURCE})
 
@@ -46,6 +46,7 @@ target_include_directories(compiler PRIVATE
     .                                       # current dir
     ${CMAKE_CURRENT_BINARY_DIR}             # generated header by flex/bison
     ${INC_DIR}
+    ${CMAKE_SOURCE_DIR}/include
 )
 
 # link libraries
