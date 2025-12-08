@@ -60,8 +60,6 @@ FuncType
 
 Block
   : '{' Stmt '}' {
-    // auto stmt = std::unique_ptr<std::string>($2);
-    // $$ = new std::string("{ " + *stmt + " }");
     auto ast = new ast::BlockAST();
     ast->stmt = std::unique_ptr<ast::BaseAST>($2);
     $$ = ast;
@@ -69,8 +67,6 @@ Block
 
 Stmt
   : RETURN Number ';' {
-    // auto number = std::unique_ptr<std::string>($2);
-    // $$ = new std::string("return " + *number + ";");
     auto ast = new ast::StmtAST();
     ast->number = std::unique_ptr<ast::BaseAST>($2);
     $$ = ast;
@@ -78,7 +74,6 @@ Stmt
 
 Number
   : INT_CONST {
-    // $$ = new std::string(std::to_string($1));
     auto ast = new ast::NumberAST();
     ast->num = $1;
     $$ = ast;
