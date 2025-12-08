@@ -7,7 +7,6 @@
 
 std::string indent(int d) { return std::string(d * 2, ' '); }
 
-
 /**
  * @brief dump implementation
  * 

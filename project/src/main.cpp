@@ -11,7 +11,7 @@
 extern FILE *yyin;
 extern int yyparse(std::unique_ptr<ast::BaseAST> &ast);
 
-int main(int argc, const char *argv[]) {
+auto main(int argc, const char *argv[]) -> int {
   assert(argc == 5 && "There must be five parameters.");
 
   // auto mode = *(argv + 1);

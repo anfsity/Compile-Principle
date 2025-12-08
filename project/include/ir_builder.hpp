@@ -9,6 +9,6 @@ private:
 
 public:
   void append(std::string_view str) { buffer += str; }
-  std::string getResult() const { return buffer; }
+  auto getResult() -> std::string const { return buffer; }
 };
 } // namespace ir
