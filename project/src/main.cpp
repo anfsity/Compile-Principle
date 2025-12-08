@@ -3,9 +3,10 @@
 #include <memory>
 #include <cstdio>
 #include <string>
-#include "ast.hpp"
 #include <fmt/core.h>
 #include <fmt/os.h>
+#include "ast.hpp"
+#include "ir_builder.hpp"
 
 extern FILE *yyin;
 extern int yyparse(std::unique_ptr<ast::BaseAST> &ast);
@@ -27,8 +28,9 @@ int main(int argc, const char *argv[]) {
   fmt::println("parsing successed! there is a AST:");
   ast->Dump(0);
 
-  std::string ir;
-  ast->CodeGen(ir);
+  ir::KoopaBuilder builder;
+  ast->CodeGen(builder);
+  std::string ir = builder.getResult();
   auto out = fmt::output_file(outputFile);
   out.print("{}", ir);
 

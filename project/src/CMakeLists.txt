@@ -58,4 +58,4 @@ target_link_libraries(compiler PRIVATE
 )
 
 # complie options
-target_compile_options(compiler PRIVATE -Wall -Wno-register -Wextra)
+target_compile_options(compiler PRIVATE -O2 -Wall -Wno-register -Wextra)

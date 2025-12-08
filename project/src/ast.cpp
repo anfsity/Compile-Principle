@@ -1,25 +1,27 @@
 // src/ast.cpp
-#include "ast.hpp"
-#include <fmt/core.h>
-#include <ranges>
 #include <string>
+#include <ranges>
+#include <fmt/core.h>
+#include "ast.hpp"
+#include "ir_builder.hpp"
 
 std::string indent(int d) { return std::string(d * 2, ' '); }
 
-void ast::CompUnitAST::Dump(int depth) const {
+
+/**
+ * @brief dump implementation
+ * 
+ */
+
+namespace ast {
+void CompUnitAST::Dump(int depth) const {
   fmt::println("{}CompUnitAST:", indent(depth));
   if (func_def) {
     func_def->Dump(depth + 1);
   }
 }
 
-void ast::CompUnitAST::CodeGen(std::string &ir) const {
-  if (func_def) {
-    func_def->CodeGen(ir);
-  }
-}
-
-void ast::FuncDefAST::Dump(int depth) const {
+void FuncDefAST::Dump(int depth) const {
   fmt::println("{}FuncDefAST: {}", indent(depth), ident);
   if (func_type) {
     func_type->Dump(depth + 1);
@@ -29,58 +31,74 @@ void ast::FuncDefAST::Dump(int depth) const {
   }
 }
 
-void ast::FuncDefAST::CodeGen(std::string &ir) const {
-  ir += "fun @" + ident + "(): ";
-  if (func_type) {
-    func_type->CodeGen(ir);
-  }
-  if (block) {
-    block->CodeGen(ir);
-  }
-}
-
-void ast::FuncTypeAST::Dump(int depth) const {
+void FuncTypeAST::Dump(int depth) const {
   fmt::println("{}FuncTypeAST: {}", indent(depth), type);
 }
 
-void ast::FuncTypeAST::CodeGen(std::string &ir) const {
-  ir += "i32 ";
-}
-
-void ast::BlockAST::Dump(int depth) const {
+void BlockAST::Dump(int depth) const {
   fmt::println("{}BlockAST:", indent(depth));
   if (stmt) {
     stmt->Dump(depth + 1);
   }
 }
 
-void ast::BlockAST::CodeGen(std::string &ir) const {
-  ir += "{\n%entry:\n";
-  if (stmt) {
-    stmt->CodeGen(ir);
-  }
-  ir += "}";
-}
-
-void ast::StmtAST::Dump(int depth) const {
+void StmtAST::Dump(int depth) const {
   fmt::println("{}StmtAST(return):", indent(depth));
   if (number) {
     number->Dump(depth + 1);
   }
 }
 
-void ast::StmtAST::CodeGen(std::string &ir) const {
-  ir += "   ret ";
-  if (number) {
-    number->CodeGen(ir);
-  }
-  ir += "\n";
-}
-
-void ast::NumberAST::Dump(int depth) const {
+void NumberAST::Dump(int depth) const {
   fmt::println("{}NumberAST: {}", indent(depth), num);
 }
+} // namespace ast
 
-void ast::NumberAST::CodeGen(std::string &ir) const {
-  ir += std::to_string(num);
+/**
+ * @brief codegen implementation
+ * 
+ */
+
+namespace ast {
+  void CompUnitAST::CodeGen(ir::KoopaBuilder &builder) const {
+    if (func_def) {
+      func_def->CodeGen(builder);
+    }
+  }
+
+  void FuncDefAST::CodeGen(ir::KoopaBuilder &builder) const {
+    builder.append("fun @");
+    builder.append(ident);
+    builder.append("(): ");
+    if (func_type) {
+      func_type->CodeGen(builder);
+    }
+    if (block) {
+      block->CodeGen(builder);
+    }
+  }
+
+  void FuncTypeAST::CodeGen(ir::KoopaBuilder &builder) const {
+    builder.append("i32 ");
+  }
+
+  void BlockAST::CodeGen(ir::KoopaBuilder &builder) const {
+    builder.append("{\n%entry:\n");
+    if (stmt) {
+      stmt->CodeGen(builder);
+    }
+    builder.append("}\n");
+  }
+
+  void StmtAST::CodeGen(ir::KoopaBuilder &builder) const {
+    builder.append("   ret ");
+    if (number) {
+      number->CodeGen(builder);
+    }
+    builder.append("\n");
+  }
+
+  void NumberAST::CodeGen(ir::KoopaBuilder &builder) const {
+    builder.append(std::to_string(num));
+  }
 }
