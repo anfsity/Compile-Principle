@@ -24,7 +24,7 @@ shell:
 			$(IMAGE) bash
 
 run:
-	./cmake-build/compiler -koopa ./tests/hello.c -o hello.koopa
+	./cmake-build/compiler -koopa ./tests/hello.c -o debug/hello.koopa
 
 docker-build:
 	docker run --rm \

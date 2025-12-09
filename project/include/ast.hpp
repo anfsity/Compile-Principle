@@ -33,7 +33,7 @@ public:
 
 class FuncTypeAST : public BaseAST {
 public:
-  // Fix me: type should use enum class
+  // FIXME: type should use enum class
   std::string type;
   void dump(int depth) const override;
   void codeGen(ir::KoopaBuilder &builder) const override;

@@ -1,12 +1,13 @@
 // src/main.cpp
+#include "ast.hpp"
+#include "backend.hpp"
+#include "ir_builder.hpp"
 #include <cassert>
-#include <memory>
 #include <cstdio>
-#include <string>
 #include <fmt/core.h>
 #include <fmt/os.h>
-#include "ast.hpp"
-#include "ir_builder.hpp"
+#include <memory>
+#include <string>
 
 extern FILE *yyin;
 extern int yyparse(std::unique_ptr<ast::BaseAST> &ast);
@@ -26,13 +27,24 @@ auto main(int argc, const char *argv[]) -> int {
   assert(!ret && "parsing failed");
 
   fmt::println("parsing successed! there is a AST:");
-  ast->Dump(0);
+  ast->dump(0);
 
-  ir::KoopaBuilder builder;
-  ast->CodeGen(builder);
-  std::string ir = builder.getResult();
+  ir::KoopaBuilder irBuilder;
+  ast->codeGen(irBuilder);
+
+  const std::string ir = irBuilder.build();
   auto out = fmt::output_file(outputFile);
   out.print("{}", ir);
+
+  backend::KoopaWrapper wrapper(ir);
+  backend::TargetCodeGen generator;
+  generator.visit(wrapper.getRaw());
+
+  const std::string asmCode = generator.getAssembly();
+  auto asmOut = fmt::output_file("debug/hello.asm");
+  asmOut.print("{}", asmCode);
+  // auto out = fmt::output_file(outputFile);
+  // out.print("{}", asmCode);
 
   fclose(yyin);
   return 0;

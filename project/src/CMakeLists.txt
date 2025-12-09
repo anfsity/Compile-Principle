@@ -35,7 +35,7 @@ endif()
 # project link directories
 link_directories(${LIB_DIR})
 
-set(CXX_SOURCES main.cpp ast.cpp)
+set(CXX_SOURCES main.cpp ast.cpp backend.cpp)
 set(SOURCES ${CXX_SOURCES}
 ${FLEX_Lexer_OUTPUTS} ${BISON_Parser_OUTPUT_SOURCE})
 
