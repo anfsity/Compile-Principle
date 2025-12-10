@@ -36,13 +36,13 @@ auto main(int argc, const char *argv[]) -> int {
   auto out = fmt::output_file(outputFile);
   out.print("{}", ir);
 
-  backend::KoopaWrapper wrapper(ir);
-  backend::TargetCodeGen generator;
-  generator.visit(wrapper.getRaw());
+  // backend::KoopaWrapper wrapper(ir);
+  // backend::TargetCodeGen generator;
+  // generator.visit(wrapper.getRaw());
 
-  const std::string asmCode = generator.getAssembly();
-  auto asmOut = fmt::output_file("debug/hello.asm");
-  asmOut.print("{}", asmCode);
+  // const std::string asmCode = generator.getAssembly();
+  // auto asmOut = fmt::output_file("debug/hello.asm");
+  // asmOut.print("{}", asmCode);
   // auto out = fmt::output_file(outputFile);
   // out.print("{}", asmCode);
 

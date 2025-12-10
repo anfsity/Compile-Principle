@@ -75,6 +75,9 @@ Expr
   : Number { $$ = $1; }
   | '(' Expr ')' { $$ = $2; }
   /* unary experssion */
+  | '+' Expr {
+    $$ = $2;
+  }
   | '!' Expr {
     $$ = new ast::UnaryExprAST(ast::UnaryOp::Not, 
                 std::unique_ptr<ast::BaseAST>($2));
@@ -142,4 +145,5 @@ Number
 
 void yyerror(std::unique_ptr<ast::BaseAST> &ast, const char *str) {
   fmt::println(stderr, "{}", str);
+  if(ast) ast->dump(0);
 }

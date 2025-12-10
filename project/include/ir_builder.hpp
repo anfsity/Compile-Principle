@@ -1,15 +1,22 @@
 // include/ir_builder.hpp
 #pragma once
 
+#include <fmt/core.h>
 #include <string>
 
 namespace ir {
 class KoopaBuilder {
 private:
   std::string buffer;
+  int count = 0;
 
 public:
   void append(std::string_view str) { buffer += str; }
+
+  std::string newReg() { return fmt::format("%{}", count++); }
+
+  void reset() { count = 0; }
+
   /**
    * @brief Finalizes the construction and retrieves the generated string.
    *
