@@ -25,6 +25,9 @@ shell:
 
 run:
 	./cmake-build/compiler -koopa ./tests/hello.c -o debug/hello.koopa
+	./cmake-build/compiler -koopa ./tests/unary.c -o debug/unary.koopa
+	./cmake-build/compiler -koopa ./tests/binary.c -o debug/binary.koopa
+	./cmake-build/compiler -koopa ./tests/logic.c -o debug/logic.koopa
 
 docker-build:
 	docker run --rm \
