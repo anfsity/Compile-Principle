@@ -11,8 +11,19 @@ FuncDef   ::= FuncType IDENT "(" ")" Block;
 FuncType  ::= "int";
 
 Block     ::= "{" Stmt "}";
-Stmt      ::= "return" Number ";";
-Number    ::= INT_CONST;
+Stmt        ::= "return" Exp ";";
+
+Exp         ::= AddExp;
+PrimaryExp  ::= "(" Exp ")" | Number;
+Number      ::= INT_CONST;
+UnaryExp    ::= PrimaryExp | UnaryOp UnaryExp;
+UnaryOp     ::= "+" | "-" | "!";
+MulExp      ::= UnaryExp | MulExp ("*" | "/" | "%") UnaryExp;
+AddExp      ::= MulExp | AddExp ("+" | "-") MulExp;
+RelExp      ::= AddExp | RelExp ("<" | ">" | "<=" | ">=") AddExp;
+EqExp       ::= RelExp | EqExp ("==" | "!=") RelExp;
+LAndExp     ::= EqExp | LAndExp "&&" EqExp;
+LOrExp      ::= LAndExp | LOrExp "||" LAndExp;
  */
 
 %{
@@ -53,6 +64,13 @@ Hexadecimal 0[xX][0-9a-fA-F]+
 {Decimal}           { yylval.int_val = std::strtol(yytext, nullptr, 0); return INT_CONST; }
 {Octal}             { yylval.int_val = std::strtol(yytext, nullptr, 0); return INT_CONST; }
 {Hexadecimal}       { yylval.int_val = std::strtol(yytext, nullptr, 0); return INT_CONST; }
+
+"&&"                { return AND; }
+"||"                { return OR; }
+"<="                { return LE; }
+">="                { return GE; }
+"=="                { return EQ; }
+"!="                { return NE; }
 
 .                   { return yytext[0]; }
 %%

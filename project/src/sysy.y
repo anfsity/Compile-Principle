@@ -28,11 +28,19 @@ void yyerror(std::unique_ptr<ast::BaseAST> &ast, const char *str);
 }
 
 // terminal letters are written in uppercase.
-%token INT RETURN
+%token INT RETURN OR AND EQ NE LE GE NMINUS
 %token <str_val> IDENT
 %token <int_val> INT_CONST
 
-%type <ast_val> FuncDef FuncType Block Stmt Number
+%type <ast_val> FuncDef FuncType Block Stmt Number Expr
+
+%left OR                  // ||
+%left AND                 // &&
+%left EQ NE               // == , !=
+%left '<' '>' LE GE       // < > <= >=
+%left '+' '-'             // + -
+%left '*' '/' '%'         // * / %
+%right '!' NMINUS          // ! -
 
 %%
 CompUnit
@@ -44,39 +52,90 @@ CompUnit
 
 FuncDef
   : FuncType IDENT '(' ')' Block {
-    auto ast = new ast::FuncDefAST();
-    ast->func_type = std::unique_ptr<ast::BaseAST>($1);
-    ast->ident = *std::unique_ptr<std::string>($2);
-    ast->block = std::unique_ptr<ast::BaseAST>($5);
-    $$ = ast;
+    $$ = new ast::FuncDefAST(std::unique_ptr<ast::BaseAST>($1),
+    *std::unique_ptr<std::string>($2), std::unique_ptr<ast::BaseAST>($5));
   };
 
 FuncType
   : INT {
-    auto ast = new ast::FuncTypeAST();
-    ast->type = "int";
-    $$ = ast;
+    $$ = new ast::FuncTypeAST("int");
   };
 
 Block
   : '{' Stmt '}' {
-    auto ast = new ast::BlockAST();
-    ast->stmt = std::unique_ptr<ast::BaseAST>($2);
-    $$ = ast;
+    $$ = new ast::BlockAST(std::unique_ptr<ast::BaseAST>($2));
   };
 
 Stmt
-  : RETURN Number ';' {
-    auto ast = new ast::StmtAST();
-    ast->number = std::unique_ptr<ast::BaseAST>($2);
-    $$ = ast;
+  : RETURN Expr ';' {
+    $$ = new ast::StmtAST(std::unique_ptr<ast::BaseAST>($2));
+  };
+
+Expr
+  : Number { $$ = $1; }
+  | '(' Expr ')' { $$ = $2; }
+  /* unary experssion */
+  | '!' Expr {
+    $$ = new ast::UnaryExprAST(ast::UnaryOp::Not, 
+                std::unique_ptr<ast::BaseAST>($2));
+  }
+  | '-' Expr %prec NMINUS {
+    $$ = new ast::UnaryExprAST(ast::UnaryOp::Neg,
+                std::unique_ptr<ast::BaseAST>($2));
+  }
+  /* binary experssion */
+  | Expr '+' Expr {
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::Add,
+    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
+  }
+  | Expr '-' Expr {
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::Sub,
+    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
+  }
+  | Expr '*' Expr {
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::Mul,
+    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
+  }
+  | Expr '/' Expr {
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::Div,
+    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
+  }
+  | Expr '<' Expr {
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::Lt,
+    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
+  }
+  | Expr '>' Expr {
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::Gt,
+    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
+  }
+  | Expr LE Expr {
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::Le,
+    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
+  }
+  | Expr GE Expr {
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::Ge,
+    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
+  }
+  | Expr EQ Expr {
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::Eq,
+    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
+  }
+  | Expr NE Expr {
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::Ne,
+    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
+  }
+  | Expr AND Expr {
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::And,
+    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
+  }
+  | Expr OR Expr {
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::Or,
+    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
   };
 
 Number
   : INT_CONST {
-    auto ast = new ast::NumberAST();
-    ast->num = $1;
-    $$ = ast;
+    $$ = new ast::NumberAST($1);
   };
 
 %%
