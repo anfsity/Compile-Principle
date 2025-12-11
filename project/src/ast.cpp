@@ -87,7 +87,7 @@ void NumberAST::dump(int depth) const {
 }
 
 void UnaryExprAST::dump(int depth) const {
-  std::string opStr = (op == UnaryOp::Neg) ? "-" : "!";
+  std::string opStr = (op == UnaryOp::Neg) ? "neg" : "not";
   fmt::println("{}UnaryExprAST: {}", indent(depth), opStr);
   rhs->dump(depth + 1);
 }
@@ -178,6 +178,15 @@ std::string BinaryExprAST::codeGen(ir::KoopaBuilder &builder) const {
   std::string rhs_reg = rhs->codeGen(builder);
   std::string ret_reg = builder.newReg();
   std::string ir_op = opToString(op);
+  if (op == BinaryOp::And || op == BinaryOp::Or) {
+    std::string lhs_tmp = builder.newReg();
+    std::string rhs_tmp = builder.newReg();
+
+    builder.append(fmt::format("  {} = ne {}, 0\n", lhs_tmp, lhs_reg));
+    builder.append(fmt::format("  {} = ne {}, 0\n", rhs_tmp, lhs_reg));
+    lhs_reg = lhs_tmp;
+    rhs_reg = rhs_tmp;
+  }
   builder.append(
       fmt::format("  {} = {} {}, {}\n", ret_reg, ir_op, lhs_reg, rhs_reg));
   return ret_reg;

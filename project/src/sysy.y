@@ -111,6 +111,10 @@ Expr
     $$ = new ast::BinaryExprAST(ast::BinaryOp::Gt,
     std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
   }
+  | Expr '%' Expr {
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::Mod,
+    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
+  }
   | Expr LE Expr {
     $$ = new ast::BinaryExprAST(ast::BinaryOp::Le,
     std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
