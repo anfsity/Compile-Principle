@@ -178,6 +178,7 @@ std::string BinaryExprAST::codeGen(ir::KoopaBuilder &builder) const {
   std::string rhs_reg = rhs->codeGen(builder);
   std::string ret_reg = builder.newReg();
   std::string ir_op = opToString(op);
+  // FIXME: short-circuit evaluation not implemented
   if (op == BinaryOp::And || op == BinaryOp::Or) {
     std::string lhs_tmp = builder.newReg();
     std::string rhs_tmp = builder.newReg();

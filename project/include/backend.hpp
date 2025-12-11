@@ -4,6 +4,7 @@
 #include "ir_builder.hpp"
 #include "koopa.h"
 #include <cassert>
+#include <map>
 
 namespace backend {
 class KoopaWrapper {
@@ -66,6 +67,9 @@ public:
 class TargetCodeGen {
 private:
   std::string buffer;
+  size_t stk_frame_size = 0u;
+  // the offset of value relative to sp
+  std::map<const koopa_raw_value_t, int> stkMap;
 
 public:
   void visit(const koopa_raw_program_t &program);
@@ -85,6 +89,13 @@ public:
   [[nodiscard]] auto getAssembly() -> std::string { return std::move(buffer); }
 
 private:
+  void load_to(const koopa_raw_value_t &value, const std::string &reg);
+
+  void reset() {
+    stkMap.clear();
+    stk_frame_size = 0;
+  };
+
   // access raw function
   void visit(koopa_raw_function_t func);
 
@@ -95,6 +106,8 @@ private:
   void visit(koopa_raw_value_t value);
 
   void visit(koopa_raw_return_t ret);
+
+  void visit(const koopa_raw_binary_t &binary);
 
   void visit(koopa_raw_integer_t integer);
 };

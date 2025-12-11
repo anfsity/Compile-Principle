@@ -33,18 +33,19 @@ auto main(int argc, const char *argv[]) -> int {
   ast->codeGen(irBuilder);
 
   const std::string ir = irBuilder.build();
-  auto out = fmt::output_file(outputFile);
-  out.print("{}", ir);
+  // auto out = fmt::output_file(outputFile);
+  // out.print("{}", ir);
 
-  // backend::KoopaWrapper wrapper(ir);
-  // backend::TargetCodeGen generator;
-  // generator.visit(wrapper.getRaw());
+  backend::KoopaWrapper wrapper(ir);
+  backend::TargetCodeGen generator;
+  generator.visit(wrapper.getRaw());
 
-  // const std::string asmCode = generator.getAssembly();
+  const std::string asmCode = generator.getAssembly();
+  fmt::println("{}", asmCode);
   // auto asmOut = fmt::output_file("debug/hello.asm");
   // asmOut.print("{}", asmCode);
-  // auto out = fmt::output_file(outputFile);
-  // out.print("{}", asmCode);
+  auto out = fmt::output_file(outputFile);
+  out.print("{}", asmCode);
 
   fclose(yyin);
   return 0;
