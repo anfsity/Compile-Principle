@@ -8,6 +8,7 @@
 
 namespace ast {
 
+// ast interface
 class BaseAST {
 public:
   virtual ~BaseAST() = default;
@@ -17,6 +18,7 @@ public:
 
 class ExprAST : public BaseAST {};
 
+// enum class
 enum class BinaryOp {
     Add, Sub, Mul, Div, Mod,
     Lt, Gt, Le, Ge, Eq, Ne,
@@ -24,6 +26,8 @@ enum class BinaryOp {
 };
 
 enum class UnaryOp { Neg, Not };
+
+// enum class end
 
 class CompUnitAST : public BaseAST {
 public:
@@ -70,6 +74,8 @@ public:
   std::string codeGen(ir::KoopaBuilder &builder) const override;
 };
 
+// epxr AST begin
+
 class NumberAST : public ExprAST {
 public:
   int val;
@@ -103,5 +109,7 @@ public:
   void dump(int depth) const override;
   std::string codeGen(ir::KoopaBuilder &builder) const override;
 };
+
+// expr AST end
 
 }; // namespace ast

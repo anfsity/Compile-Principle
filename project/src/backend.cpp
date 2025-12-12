@@ -25,6 +25,7 @@ void TargetCodeGen::visit(const koopa_raw_program_t &program) {
 }
 
 void TargetCodeGen::visit(koopa_raw_function_t func) {
+  // FIXME: do not finish multiple function code gen 
   if (func->bbs.len == 0)
     return;
 
@@ -77,6 +78,7 @@ void TargetCodeGen::visit(koopa_raw_value_t value) {
     visit(kind.data.binary);
     if (value->ty->tag != KOOPA_RTT_UNIT) {
       int offset = stkMap[value];
+      // store word : the offset to return value's position
       buffer += fmt::format("  sw t0, {}(sp)\n", offset);
     }
     break;
@@ -137,6 +139,7 @@ void TargetCodeGen::visit(const koopa_raw_binary_t &binary) {
   case KOOPA_RBO_XOR:
     buffer += fmt::format("  xor t0, t0, t1\n");
     break;
+  // shift operation
   case KOOPA_RBO_SHL:
     buffer += fmt::format("  sll t0, t0, t1\n");
     break;

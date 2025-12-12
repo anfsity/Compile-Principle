@@ -1,6 +1,6 @@
   .text
   .globl main
 main:
-entry:
+.entry:
   li a0, 0
   ret
