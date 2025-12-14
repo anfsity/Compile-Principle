@@ -67,12 +67,12 @@ public:
 class TargetCodeGen {
 private:
   std::string buffer;
-  size_t stk_frame_size = 0u;
+  int stk_frame_size = 0;
   // the offset of value relative to sp
   std::map<const koopa_raw_value_t, int> stkMap;
 
 public:
-  void visit(const koopa_raw_program_t &program);
+  auto visit(const koopa_raw_program_t &program) -> void;
 
   /**
    * @brief Finalizes the construction and retrieves the generated string.
@@ -89,26 +89,26 @@ public:
   [[nodiscard]] auto getAssembly() -> std::string { return std::move(buffer); }
 
 private:
-  void load_to(const koopa_raw_value_t &value, const std::string &reg);
+  auto load_to(const koopa_raw_value_t &value, const std::string &reg) -> void;
 
-  void reset() {
+  auto reset() -> void {
     stkMap.clear();
     stk_frame_size = 0;
   };
 
   // access raw function
-  void visit(koopa_raw_function_t func);
+  auto visit(koopa_raw_function_t func) -> void;
 
   // access raw basic block
-  void visit(koopa_raw_basic_block_t bb);
+  auto visit(koopa_raw_basic_block_t bb) -> void;
 
   // access raw insts
-  void visit(koopa_raw_value_t value);
+  auto visit(koopa_raw_value_t value) -> void;
 
-  void visit(koopa_raw_return_t ret);
+  auto visit(koopa_raw_return_t ret) -> void;
 
-  void visit(const koopa_raw_binary_t &binary);
+  auto visit(const koopa_raw_binary_t &binary) -> void;
 
-  void visit(koopa_raw_integer_t integer);
+  auto visit(koopa_raw_integer_t integer) -> void;
 };
 } // namespace backend

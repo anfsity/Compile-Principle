@@ -11,11 +11,11 @@ private:
   int count = 0;
 
 public:
-  void append(std::string_view str) { buffer += str; }
+  auto append(std::string_view str) -> void { buffer += str; }
 
-  std::string newReg() { return fmt::format("%{}", count++); }
+  auto newReg() -> std::string { return fmt::format("%{}", count++); }
 
-  void reset() { count = 0; }
+  auto reset() -> void { count = 0; }
 
   /**
    * @brief Finalizes the construction and retrieves the generated string.

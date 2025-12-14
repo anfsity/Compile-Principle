@@ -27,7 +27,7 @@ auto main(int argc, const char *argv[]) -> int {
   auto ret = yyparse(ast);
   assert(!ret && "parsing failed");
 
-  // generate abstract sematic tree
+  // generate abstract semantic tree
   fmt::println("parsing successed! there is a AST:");
   ast->dump(0);
 

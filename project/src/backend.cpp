@@ -7,6 +7,23 @@
 #include <span>
 
 namespace backend {
+/**
+ * @brief Converts a raw Koopa slice (void**) into a typed C++ span.
+ *
+ * @tparam ptrType The Koopa type, which SHOULD be a pointer typedef.
+ *         (e.g., koopa_raw_function_t, NOT koopa_raw_function_data_t)
+ *
+ * @note Memory Layout Explanation:
+ * Koopa's slice.buffer is 'const void**', meaning it is an array of pointers.
+ * We reinterpret_cast it to 'const ptrType*', effectively treating it as:
+ *
+ *    [ void* ] [ void* ] ...  (Raw View)
+ *       |         |
+ *       v         v
+ *    [ Func* ] [ Func* ] ...  (Typed View via Span)
+ *
+ * This allows us to iterate using: for (koopa_raw_function_t func : span) ...
+ */
 template <typename ptrType> auto make_span(const koopa_raw_slice_t &slice) {
   return std::span<const ptrType>(
       reinterpret_cast<const ptrType *>(slice.buffer), slice.len);
@@ -15,7 +32,7 @@ template <typename ptrType> auto make_span(const koopa_raw_slice_t &slice) {
 
 using namespace backend;
 
-void TargetCodeGen::visit(const koopa_raw_program_t &program) {
+auto TargetCodeGen::visit(const koopa_raw_program_t &program) -> void {
   // gobal values
   // FIXME: need process gobal values
   // function
@@ -24,14 +41,15 @@ void TargetCodeGen::visit(const koopa_raw_program_t &program) {
   }
 }
 
-void TargetCodeGen::visit(koopa_raw_function_t func) {
-  // FIXME: do not finish multiple function code gen 
+auto TargetCodeGen::visit(koopa_raw_function_t func) -> void {
+  // FIXME: have not finished multiple function code gen yet
   if (func->bbs.len == 0)
     return;
 
   reset();
   for (const auto bb : make_span<koopa_raw_basic_block_t>(func->bbs)) {
     for (const auto inst : make_span<koopa_raw_value_t>(bb->insts)) {
+      // KOOPA_RTT_UNIT : Unit (void).
       if (inst->ty->tag != KOOPA_RTT_UNIT) {
         stkMap[inst] = stk_frame_size;
         stk_frame_size += 4;
@@ -56,7 +74,7 @@ void TargetCodeGen::visit(koopa_raw_function_t func) {
   }
 }
 
-void TargetCodeGen::visit(koopa_raw_basic_block_t bb) {
+auto TargetCodeGen::visit(koopa_raw_basic_block_t bb) -> void {
   if (bb->name) {
     buffer += fmt::format(".{}:\n", bb->name + 1);
   }
@@ -65,7 +83,7 @@ void TargetCodeGen::visit(koopa_raw_basic_block_t bb) {
   }
 }
 
-void TargetCodeGen::visit(koopa_raw_value_t value) {
+auto TargetCodeGen::visit(koopa_raw_value_t value) -> void {
   const auto &kind = value->kind;
   switch (kind.tag) {
   case KOOPA_RVT_RETURN:
@@ -78,7 +96,7 @@ void TargetCodeGen::visit(koopa_raw_value_t value) {
     visit(kind.data.binary);
     if (value->ty->tag != KOOPA_RTT_UNIT) {
       int offset = stkMap[value];
-      // store word : the offset to return value's position
+      // store word : store the instruction's value to the stack (sp + offset)
       buffer += fmt::format("  sw t0, {}(sp)\n", offset);
     }
     break;
@@ -87,7 +105,7 @@ void TargetCodeGen::visit(koopa_raw_value_t value) {
   }
 }
 
-void TargetCodeGen::visit(koopa_raw_return_t ret) {
+auto TargetCodeGen::visit(koopa_raw_return_t ret) -> void {
   if (ret.value) {
     load_to(ret.value, "a0");
   }
@@ -97,8 +115,8 @@ void TargetCodeGen::visit(koopa_raw_return_t ret) {
   buffer += "  ret\n";
 }
 
-void TargetCodeGen::load_to(const koopa_raw_value_t &value,
-                            const std::string &reg) {
+auto TargetCodeGen::load_to(const koopa_raw_value_t &value,
+                            const std::string &reg) -> void {
   if (value->kind.tag == KOOPA_RVT_INTEGER) {
     int32_t val = value->kind.data.integer.value;
     // li t0, im
@@ -110,7 +128,7 @@ void TargetCodeGen::load_to(const koopa_raw_value_t &value,
   }
 }
 
-void TargetCodeGen::visit(const koopa_raw_binary_t &binary) {
+auto TargetCodeGen::visit(const koopa_raw_binary_t &binary) -> void {
   load_to(binary.lhs, "t0");
   load_to(binary.rhs, "t1");
 
@@ -177,4 +195,4 @@ void TargetCodeGen::visit(const koopa_raw_binary_t &binary) {
   }
 }
 
-void TargetCodeGen::visit(koopa_raw_integer_t) {}
+auto TargetCodeGen::visit(koopa_raw_integer_t) -> void {}

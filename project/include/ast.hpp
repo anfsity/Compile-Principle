@@ -12,13 +12,14 @@ namespace ast {
 class BaseAST {
 public:
   virtual ~BaseAST() = default;
-  virtual void dump(int depth) const = 0;
-  virtual std::string codeGen(ir::KoopaBuilder &builder) const = 0;
+  virtual auto dump(int depth) const -> void = 0;
+  virtual auto codeGen(ir::KoopaBuilder &builder) const -> std::string = 0;
 };
 
 class ExprAST : public BaseAST {};
 
 // enum class
+// clang-format off
 enum class BinaryOp {
     Add, Sub, Mul, Div, Mod,
     Lt, Gt, Le, Ge, Eq, Ne,
@@ -27,13 +28,14 @@ enum class BinaryOp {
 
 enum class UnaryOp { Neg, Not };
 
+// clang-format on
 // enum class end
 
 class CompUnitAST : public BaseAST {
 public:
   std::unique_ptr<BaseAST> func_def;
-  void dump(int depth) const override;
-  std::string codeGen(ir::KoopaBuilder &builder) const override;
+  auto dump(int depth) const -> void override;
+  auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };
 
 class FuncDefAST : public BaseAST {
@@ -45,8 +47,8 @@ public:
              std::unique_ptr<BaseAST> _block)
       : func_type(std::move(_func_type)), ident(_ident),
         block(std::move(_block)) {}
-  void dump(int depth) const override;
-  std::string codeGen(ir::KoopaBuilder &builder) const override;
+  auto dump(int depth) const -> void override;
+  auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };
 
 class FuncTypeAST : public BaseAST {
@@ -54,24 +56,24 @@ public:
   // FIXME: type should use enum class
   std::string type;
   FuncTypeAST(std::string _type) : type(_type) {}
-  void dump(int depth) const override;
-  std::string codeGen(ir::KoopaBuilder &builder) const override;
+  auto dump(int depth) const -> void override;
+  auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };
 
 class BlockAST : public BaseAST {
 public:
   std::unique_ptr<BaseAST> stmt;
   BlockAST(std::unique_ptr<BaseAST> _stmt) : stmt(std::move(_stmt)) {}
-  void dump(int depth) const override;
-  std::string codeGen(ir::KoopaBuilder &builder) const override;
+  auto dump(int depth) const -> void override;
+  auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };
 
 class StmtAST : public BaseAST {
 public:
   std::unique_ptr<BaseAST> expr;
   StmtAST(std::unique_ptr<BaseAST> _expr) : expr(std::move(_expr)) {}
-  void dump(int depth) const override;
-  std::string codeGen(ir::KoopaBuilder &builder) const override;
+  auto dump(int depth) const -> void override;
+  auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };
 
 // epxr AST begin
@@ -80,8 +82,8 @@ class NumberAST : public ExprAST {
 public:
   int val;
   NumberAST(int _val) : val(_val) {};
-  void dump(int depth) const override;
-  std::string codeGen(ir::KoopaBuilder &builder) const override;
+  auto dump(int depth) const -> void override;
+  auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };
 
 class UnaryExprAST : public ExprAST {
@@ -92,8 +94,8 @@ public:
   UnaryExprAST(UnaryOp _op, std::unique_ptr<BaseAST> _rhs)
       : op(_op), rhs(std::move(_rhs)) {}
 
-  void dump(int depth) const override;
-  std::string codeGen(ir::KoopaBuilder &builder) const override;
+  auto dump(int depth) const -> void override;
+  auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };
 
 class BinaryExprAST : public ExprAST {
@@ -106,8 +108,8 @@ public:
                 std::unique_ptr<BaseAST> _rhs)
       : op(_op), lhs(std::move(_lhs)), rhs(std::move(_rhs)) {}
 
-  void dump(int depth) const override;
-  std::string codeGen(ir::KoopaBuilder &builder) const override;
+  auto dump(int depth) const -> void override;
+  auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };
 
 // expr AST end
