@@ -18,6 +18,7 @@ public:
 };
 
 class IntType : public Type {
+public:
   auto debug() const -> std::string override { return "int"; }
   auto is_int() const -> bool override { return true; }
   static auto get() -> std::shared_ptr<IntType> {
@@ -27,6 +28,7 @@ class IntType : public Type {
 };
 
 class VoidType : public Type {
+public:
   auto debug() const -> std::string override { return "void"; }
   auto is_void() const -> bool override { return true; }
   static auto get() -> std::shared_ptr<VoidType> {
@@ -36,6 +38,7 @@ class VoidType : public Type {
 };
 
 class BoolType : public Type {
+public:
   auto debug() const -> std::string override { return "bool"; }
   auto is_bool() const -> bool override { return true; }
   static auto get() -> std::shared_ptr<BoolType> {
@@ -45,9 +48,12 @@ class BoolType : public Type {
 };
 
 class PtrType : public Type {
+public:
   std::shared_ptr<Type> target;
   PtrType(std::shared_ptr<Type> t) : target(t) {};
-  auto debug() const -> std::string override { return fmt::format("*{}", target->debug()); }
+  auto debug() const -> std::string override {
+    return fmt::format("*{}", target->debug());
+  }
   auto is_ptr() const -> bool override { return true; }
 };
 

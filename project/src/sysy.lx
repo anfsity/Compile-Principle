@@ -10,11 +10,22 @@ CompUnit  ::= FuncDef;
 FuncDef   ::= FuncType IDENT "(" ")" Block;
 FuncType  ::= "int";
 
-Block     ::= "{" Stmt "}";
+Block         ::= "{" {BlockItem} "}";
+BlockItem     ::= Decl | Stmt;
+
+Decl          ::= ConstDecl;
+ConstDecl     ::= "const" BType ConstDef {"," ConstDef} ";";
+BType         ::= "int";
+ConstDef      ::= IDENT "=" ConstInitVal;
+ConstInitVal  ::= ConstExp;
+
 Stmt        ::= "return" Exp ";";
 
 Exp         ::= AddExp;
-PrimaryExp  ::= "(" Exp ")" | Number;
+LVal          ::= IDENT;
+
+PrimaryExp    ::= "(" Exp ")" | LVal | Number;
+ConstExp      ::= Exp;
 Number      ::= INT_CONST;
 UnaryExp    ::= PrimaryExp | UnaryOp UnaryExp;
 UnaryOp     ::= "+" | "-" | "!";
@@ -58,6 +69,8 @@ Hexadecimal 0[xX][0-9a-fA-F]+
 
 "int"               { return INT; }
 "return"            { return RETURN; }
+"void"              { return VOID; }
+"const"             { return CONST; }
 
 {Identifier}        { yylval.str_val = new std::string(yytext); return IDENT; }
 

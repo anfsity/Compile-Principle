@@ -1,5 +1,5 @@
-// tests/hello.c
 int main() {
-  // 忽略我的存在
-  return 0;
+  const int a = 1;
+  int b = 2;
+  return a + b;
 }

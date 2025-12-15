@@ -2,6 +2,7 @@
 %code requires {
   #include <memory>
   #include <string>
+  // #include <vector>
   #include "ast.hpp"
 // code in this will be inserted into sysy.lex.hpp
 }
@@ -9,6 +10,7 @@
 %{
 #include <memory>
 #include <string>
+#include <vector>
 #include "ast.hpp"
 #include <fmt/core.h>
 
@@ -25,14 +27,36 @@ void yyerror(std::unique_ptr<ast::BaseAST> &ast, const char *str);
   std::string *str_val;
   int int_val;
   ast::BaseAST *ast_val;
+  std::vector<std::unique_ptr<ast::BaseAST>> *items_val;
+  std::vector<std::unique_ptr<ast::DefAST>> *defs_val;
 }
 
+/**
+Decl          ::= ConstDecl;
+ConstDecl     ::= "const" BType ConstDef {"," ConstDef} ";";
+BType         ::= "int";
+ConstDef      ::= IDENT "=" ConstInitVal;
+ConstInitVal  ::= ConstExp;
+
+Block         ::= "{" {BlockItem} "}";
+BlockItem     ::= Decl | Stmt;
+
+LVal          ::= IDENT;
+PrimaryExp    ::= "(" Exp ")" | LVal | Number;
+
+ConstExp      ::= Exp;
+ */
+
 // terminal letters are written in uppercase.
-%token INT RETURN OR AND EQ NE LE GE NMINUS
+%token VOID INT RETURN OR AND EQ NE LE GE PRIORITY CONST
 %token <str_val> IDENT
 %token <int_val> INT_CONST
 
-%type <ast_val> FuncDef FuncType Block Stmt Number Expr
+%type <str_val> Btype
+%type <ast_val> FuncDef FuncType Block Stmt Number Expr LVal Decl ConstDecl VarDecl
+%type <ast_val> ConstDef VarDef BlockItem
+%type <items_val> BlockItemList
+%type <defs_val> VarDefList ConstDefList
 
 %left OR                  // ||
 %left AND                 // &&
@@ -40,7 +64,7 @@ void yyerror(std::unique_ptr<ast::BaseAST> &ast, const char *str);
 %left '<' '>' LE GE       // < > <= >=
 %left '+' '-'             // + -
 %left '*' '/' '%'         // * / %
-%right '!' NMINUS          // ! -
+%right '!' PRIORITY          // ! -
 
 %%
 CompUnit
@@ -52,8 +76,7 @@ CompUnit
 
 FuncDef
   : FuncType IDENT '(' ')' Block {
-    $$ = new ast::FuncDefAST(std::unique_ptr<ast::BaseAST>($1),
-    *std::unique_ptr<std::string>($2), std::unique_ptr<ast::BaseAST>($5));
+    $$ = new ast::FuncDefAST($1, std::move(*$2), $5);
   };
 
 FuncType
@@ -62,87 +85,156 @@ FuncType
   };
 
 Block
-  : '{' Stmt '}' {
-    $$ = new ast::BlockAST(std::unique_ptr<ast::BaseAST>($2));
+  : '{' BlockItemList '}' {
+    $$ = new ast::BlockAST($2);
   };
+
+BlockItemList
+  : {
+    $$ = new std::vector<std::unique_ptr<ast::BaseAST>>();
+  }
+  | BlockItemList BlockItem {
+    $$ = $1;
+    $$->push_back(std::unique_ptr<ast::BaseAST>($2));
+  };
+
+BlockItem
+  : Decl { $$ = $1; }
+  | Stmt { $$ = $1; };
+
+Decl 
+  : ConstDecl { $$ = $1; }
+  | VarDecl   { $$ = $1; };
+
+ConstDecl
+  : CONST Btype ConstDefList ';' {
+    $$ = new ast::DeclAST(true, std::move(*$2), $3);
+  };
+
+ConstDefList
+  : ConstDef {
+    $$ = new std::vector<std::unique_ptr<ast::DefAST>>();
+    $$->push_back(std::unique_ptr<ast::DefAST>(static_cast<ast::DefAST *>($1)));
+  }
+  | ConstDefList ',' ConstDef {
+    $$ = $1;
+    $$->push_back(std::unique_ptr<ast::DefAST>(static_cast<ast::DefAST *>($3)));
+  };
+
+ConstDef 
+  : IDENT '=' Expr {
+    $$ = new ast::DefAST(true, std::move(*$1), $3);
+  };
+
+VarDecl
+  : Btype VarDefList ';' {
+    $$ = new ast::DeclAST(false, std::move(*$1), $2);
+  }
+
+VarDefList
+  : VarDef {
+    $$ = new std::vector<std::unique_ptr<ast::DefAST>>();
+    $$->push_back(std::unique_ptr<ast::DefAST>(static_cast<ast::DefAST *>($1)));
+  };
+  | VarDefList ',' VarDef {
+    $$ = $1;
+    $$->push_back(std::unique_ptr<ast::DefAST>(static_cast<ast::DefAST *>($3)));
+  };
+
+VarDef 
+  : IDENT '=' Expr {
+    $$ = new ast::DefAST(false, std::move(*$1), $3);
+  };
+  | IDENT {
+    $$ = new ast::DefAST(false, std::move(*$1), nullptr);
+  };
+
+Btype
+  : INT { $$ = new std::string("int"); }
+  | VOID { $$ = new std::string("void"); };
 
 Stmt
   : RETURN Expr ';' {
-    $$ = new ast::StmtAST(std::unique_ptr<ast::BaseAST>($2));
-  };
+    $$ = new ast::ReturnStmtAST($2);
+  }
+  | RETURN { $$ = new ast::ReturnStmtAST(nullptr); }
+  | LVal '=' Expr ';' {
+    $$ = new ast::AssignStmtAST($1, $3);
+  }
+  | Block {
+    $$ = $1;
+  }
+  | Expr ';' {
+    $$ = new ast::ExprStmtAST($1);
+  }
+  | ';' {
+    $$ = new ast::ExprStmtAST(nullptr);
+  }
 
 Expr
   : Number { $$ = $1; }
   | '(' Expr ')' { $$ = $2; }
+  | LVal { $$ = $1; }
   /* unary experssion */
-  | '+' Expr {
+  | '!' Expr {
+    $$ = new ast::UnaryExprAST(ast::UnaryOp::Not, $2);
+  }
+  | '+' Expr %prec PRIORITY{
     $$ = $2;
   }
-  | '!' Expr {
-    $$ = new ast::UnaryExprAST(ast::UnaryOp::Not, 
-                std::unique_ptr<ast::BaseAST>($2));
-  }
-  | '-' Expr %prec NMINUS {
-    $$ = new ast::UnaryExprAST(ast::UnaryOp::Neg,
-                std::unique_ptr<ast::BaseAST>($2));
+  | '-' Expr %prec PRIORITY {
+    $$ = new ast::UnaryExprAST(ast::UnaryOp::Neg, $2);
   }
   /* binary experssion */
   | Expr '+' Expr {
-    $$ = new ast::BinaryExprAST(ast::BinaryOp::Add,
-    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::Add, $1, $3);
   }
   | Expr '-' Expr {
-    $$ = new ast::BinaryExprAST(ast::BinaryOp::Sub,
-    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::Sub, $1, $3);
   }
   | Expr '*' Expr {
-    $$ = new ast::BinaryExprAST(ast::BinaryOp::Mul,
-    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::Mul, $1, $3);
   }
   | Expr '/' Expr {
-    $$ = new ast::BinaryExprAST(ast::BinaryOp::Div,
-    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::Div, $1, $3);
   }
   | Expr '<' Expr {
-    $$ = new ast::BinaryExprAST(ast::BinaryOp::Lt,
-    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::Lt, $1, $3);
   }
   | Expr '>' Expr {
-    $$ = new ast::BinaryExprAST(ast::BinaryOp::Gt,
-    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::Gt, $1, $3);
   }
   | Expr '%' Expr {
-    $$ = new ast::BinaryExprAST(ast::BinaryOp::Mod,
-    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::Mod, $1, $3);
   }
   | Expr LE Expr {
-    $$ = new ast::BinaryExprAST(ast::BinaryOp::Le,
-    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::Le, $1, $3);
   }
   | Expr GE Expr {
-    $$ = new ast::BinaryExprAST(ast::BinaryOp::Ge,
-    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::Ge, $1, $3);
   }
   | Expr EQ Expr {
-    $$ = new ast::BinaryExprAST(ast::BinaryOp::Eq,
-    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::Eq, $1, $3);
   }
   | Expr NE Expr {
-    $$ = new ast::BinaryExprAST(ast::BinaryOp::Ne,
-    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::Ne, $1, $3);
   }
   | Expr AND Expr {
-    $$ = new ast::BinaryExprAST(ast::BinaryOp::And,
-    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::And, $1, $3);
   }
   | Expr OR Expr {
-    $$ = new ast::BinaryExprAST(ast::BinaryOp::Or,
-    std::unique_ptr<ast::BaseAST>($1), std::unique_ptr<ast::BaseAST>($3));
+    $$ = new ast::BinaryExprAST(ast::BinaryOp::Or, $1, $3);
   };
 
 Number
   : INT_CONST {
     $$ = new ast::NumberAST($1);
+  };
+
+LVal 
+  : IDENT {
+    $$ = new ast::LValAST(std::move(*$1));
+    delete $1;
   };
 
 %%

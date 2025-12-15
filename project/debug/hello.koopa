@@ -1,4 +1,8 @@
 fun @main(): i32 {
 %entry:
-  ret 0
+  @b_0 = alloc i32
+  store 2, @b_0
+  %0 = load @b_0
+  %1 = add 1, %0
+  ret %1
 }
