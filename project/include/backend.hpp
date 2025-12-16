@@ -110,5 +110,13 @@ private:
   auto visit(const koopa_raw_binary_t &binary) -> void;
 
   auto visit(koopa_raw_integer_t integer) -> void;
+/*
+    koopa_raw_load_t load;
+    koopa_raw_store_t store;
+*/
+  auto visit(const koopa_raw_load_t &load) -> void;
+
+  auto visit(const koopa_raw_store_t &store) -> void;
+
 };
 } // namespace backend

@@ -10,7 +10,7 @@ namespace backend {
 /**
  * @brief Converts a raw Koopa slice (void**) into a typed C++ span.
  *
- * @tparam ptrType The Koopa type, which SHOULD be a pointer typedef.
+ * @param ptrType The Koopa type, which SHOULD be a pointer typedef.
  *         (e.g., koopa_raw_function_t, NOT koopa_raw_function_data_t)
  *
  * @note Memory Layout Explanation:
@@ -35,7 +35,6 @@ using namespace backend;
 auto TargetCodeGen::visit(const koopa_raw_program_t &program) -> void {
   // gobal values
   // FIXME: need process gobal values
-  // function
   for (const auto func : make_span<koopa_raw_function_t>(program.funcs)) {
     visit(func);
   }
@@ -86,12 +85,9 @@ auto TargetCodeGen::visit(koopa_raw_basic_block_t bb) -> void {
 auto TargetCodeGen::visit(koopa_raw_value_t value) -> void {
   const auto &kind = value->kind;
   switch (kind.tag) {
-  case KOOPA_RVT_RETURN:
-    visit(kind.data.ret);
-    break;
-  case KOOPA_RVT_INTEGER:
-    visit(kind.data.integer);
-    break;
+
+  case KOOPA_RVT_RETURN: visit(kind.data.ret); break;
+  case KOOPA_RVT_INTEGER: visit(kind.data.integer); break;
   case KOOPA_RVT_BINARY:
     visit(kind.data.binary);
     if (value->ty->tag != KOOPA_RTT_UNIT) {
@@ -100,9 +96,33 @@ auto TargetCodeGen::visit(koopa_raw_value_t value) -> void {
       buffer += fmt::format("  sw t0, {}(sp)\n", offset);
     }
     break;
-  default:
-    assert(false);
+  case KOOPA_RVT_ALLOC:
+    /* nothing to do */
+    break;
+  case KOOPA_RVT_LOAD:
+    visit(kind.data.load);
+    if (value->ty->tag != KOOPA_RTT_UNIT) {
+      int offset = stkMap[value];
+      // store word : store the instruction's value to the stack (sp + offset)
+      buffer += fmt::format("  sw t0, {}(sp)\n", offset);
+    }
+    break;
+  case KOOPA_RVT_STORE: visit(kind.data.store); break;
+  default: assert(false);
   }
+}
+
+auto TargetCodeGen::visit(const koopa_raw_load_t &load) -> void {
+  // load source must be alived here
+  load_to(load.src, "t0");
+}
+
+auto TargetCodeGen::visit(const koopa_raw_store_t &store) -> void {
+  // store src dest
+  load_to(store.value, "t0");
+  int offset = stkMap[store.dest];
+  // store word : store the instruction's value to the stack (sp + offset)
+  buffer += fmt::format("  sw t0, {}(sp)\n", offset);
 }
 
 auto TargetCodeGen::visit(koopa_raw_return_t ret) -> void {
@@ -133,47 +153,21 @@ auto TargetCodeGen::visit(const koopa_raw_binary_t &binary) -> void {
   load_to(binary.rhs, "t1");
 
   switch (binary.op) {
-  case KOOPA_RBO_ADD:
-    buffer += fmt::format("  add t0, t0, t1\n");
-    break;
-  case KOOPA_RBO_SUB:
-    buffer += fmt::format("  sub t0, t0, t1\n");
-    break;
-  case KOOPA_RBO_MUL:
-    buffer += fmt::format("  mul t0, t0, t1\n");
-    break;
-  case KOOPA_RBO_DIV:
-    buffer += fmt::format("  div t0, t0, t1\n");
-    break;
-  case KOOPA_RBO_MOD:
-    buffer += fmt::format("  rem t0, t0, t1\n");
-    break;
-  case KOOPA_RBO_AND:
-    buffer += fmt::format("  and t0, t0, t1\n");
-    break;
-  case KOOPA_RBO_OR:
-    buffer += fmt::format("  or  t0, t0, t1\n");
-    break;
-  case KOOPA_RBO_XOR:
-    buffer += fmt::format("  xor t0, t0, t1\n");
-    break;
+  case KOOPA_RBO_ADD: buffer += fmt::format("  add t0, t0, t1\n"); break;
+  case KOOPA_RBO_SUB: buffer += fmt::format("  sub t0, t0, t1\n"); break;
+  case KOOPA_RBO_MUL: buffer += fmt::format("  mul t0, t0, t1\n"); break;
+  case KOOPA_RBO_DIV: buffer += fmt::format("  div t0, t0, t1\n"); break;
+  case KOOPA_RBO_MOD: buffer += fmt::format("  rem t0, t0, t1\n"); break;
+  case KOOPA_RBO_AND: buffer += fmt::format("  and t0, t0, t1\n"); break;
+  case KOOPA_RBO_OR: buffer += fmt::format("  or  t0, t0, t1\n"); break;
+  case KOOPA_RBO_XOR: buffer += fmt::format("  xor t0, t0, t1\n"); break;
   // shift operation
-  case KOOPA_RBO_SHL:
-    buffer += fmt::format("  sll t0, t0, t1\n");
-    break;
-  case KOOPA_RBO_SHR:
-    buffer += fmt::format("  srl t0, t0, t1\n");
-    break;
-  case KOOPA_RBO_SAR:
-    buffer += fmt::format("  sra t0, t0, t1\n");
-    break;
+  case KOOPA_RBO_SHL: buffer += fmt::format("  sll t0, t0, t1\n"); break;
+  case KOOPA_RBO_SHR: buffer += fmt::format("  srl t0, t0, t1\n"); break;
+  case KOOPA_RBO_SAR: buffer += fmt::format("  sra t0, t0, t1\n"); break;
   // complex instruction
-  case KOOPA_RBO_LT:
-    buffer += fmt::format("  slt t0, t0, t1\n");
-    break;
-  case KOOPA_RBO_GT:
-    buffer += fmt::format("  sgt t0, t0, t1\n");
-    break;
+  case KOOPA_RBO_LT: buffer += fmt::format("  slt t0, t0, t1\n"); break;
+  case KOOPA_RBO_GT: buffer += fmt::format("  sgt t0, t0, t1\n"); break;
   case KOOPA_RBO_LE:
     buffer += fmt::format("  sgt t0, t0, t1\n");
     buffer += fmt::format("  seqz t0, t0\n");
@@ -190,8 +184,7 @@ auto TargetCodeGen::visit(const koopa_raw_binary_t &binary) -> void {
     buffer += fmt::format("  xor t0, t0, t1\n");
     buffer += fmt::format("  snez t0, t0\n");
     break;
-  default:
-    assert(false);
+  default: assert(false);
   }
 }
 

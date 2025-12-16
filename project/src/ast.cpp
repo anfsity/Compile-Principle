@@ -52,7 +52,7 @@ AssignStmtAST::AssignStmtAST(BaseAST *_lval, BaseAST *_expr) {
 }
 
 /**
- * @brief dump implementation
+ ** @brief dump implementation
  *
  */
 
@@ -76,6 +76,7 @@ auto FuncDefAST::dump(int depth) const -> void {
 auto FuncTypeAST::dump(int depth) const -> void {
   fmt::println("{}FuncTypeAST: {}", indent(depth), type);
 }
+
 auto DeclAST::dump(int depth) const -> void {
   std::string declType = isConst ? "ConstDecl" : "VarDecl";
   fmt::println("{}{}: {}", indent(depth), declType, btype);
@@ -139,7 +140,7 @@ auto BinaryExprAST::dump(int depth) const -> void {
 }
 
 /**
- * @brief codegen implementation
+ ** @brief codegen implementation
  *
  */
 
@@ -293,7 +294,7 @@ auto BinaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 }
 
 /**
- * @brief calculate constexpr value
+ ** @brief calculate constexpr value
  *
  */
 

@@ -53,8 +53,8 @@ ConstExp      ::= Exp;
 %token <int_val> INT_CONST
 
 %type <str_val> Btype
-%type <ast_val> FuncDef FuncType Block Stmt Number Expr LVal Decl ConstDecl VarDecl
-%type <ast_val> ConstDef VarDef BlockItem
+%type <ast_val> FuncDef FuncType Block Stmt Number Expr LVal
+%type <ast_val> ConstDef VarDef BlockItem Decl ConstDecl VarDecl
 %type <items_val> BlockItemList
 %type <defs_val> VarDefList ConstDefList
 
@@ -77,6 +77,7 @@ CompUnit
 FuncDef
   : FuncType IDENT '(' ')' Block {
     $$ = new ast::FuncDefAST($1, std::move(*$2), $5);
+    delete $2;
   };
 
 FuncType
@@ -109,6 +110,7 @@ Decl
 ConstDecl
   : CONST Btype ConstDefList ';' {
     $$ = new ast::DeclAST(true, std::move(*$2), $3);
+    delete $2;
   };
 
 ConstDefList
@@ -124,11 +126,13 @@ ConstDefList
 ConstDef 
   : IDENT '=' Expr {
     $$ = new ast::DefAST(true, std::move(*$1), $3);
+    delete $1;
   };
 
 VarDecl
   : Btype VarDefList ';' {
     $$ = new ast::DeclAST(false, std::move(*$1), $2);
+    delete $1;
   }
 
 VarDefList
@@ -144,9 +148,11 @@ VarDefList
 VarDef 
   : IDENT '=' Expr {
     $$ = new ast::DefAST(false, std::move(*$1), $3);
+    delete $1;
   };
   | IDENT {
     $$ = new ast::DefAST(false, std::move(*$1), nullptr);
+    delete $1;
   };
 
 Btype

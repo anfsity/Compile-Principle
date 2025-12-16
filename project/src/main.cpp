@@ -41,16 +41,16 @@ auto main(int argc, const char *argv[]) -> int {
     output_bool = true;
   }
 
-  // backend::KoopaWrapper wrapper(ir);
-  // backend::TargetCodeGen generator;
-  // generator.visit(wrapper.getRaw());
+  backend::KoopaWrapper wrapper(ir);
+  backend::TargetCodeGen generator;
+  generator.visit(wrapper.getRaw());
 
-  // const std::string asmCode = generator.getAssembly();
-  // if (mode == "-riscv") {
-  //   auto out = fmt::output_file(outputFile);
-  //   out.print("{}", asmCode);
-  //   output_bool = true;
-  // }
+  const std::string asmCode = generator.getAssembly();
+  if (mode == "-riscv") {
+    auto out = fmt::output_file(outputFile);
+    out.print("{}", asmCode);
+    output_bool = true;
+  }
 
   assert(output_bool);
 

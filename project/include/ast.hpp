@@ -25,7 +25,7 @@ public:
 class LValAST;
 class DefAST;
 
-// enum class
+//* enum class
 // clang-format off
 enum class BinaryOp {
     Add, Sub, Mul, Div, Mod,
@@ -36,7 +36,7 @@ enum class BinaryOp {
 enum class UnaryOp { Neg, Not };
 
 // clang-format on
-// enum class end
+//* enum class end
 
 class CompUnitAST : public BaseAST {
 public:
@@ -59,7 +59,7 @@ public:
 
 class FuncTypeAST : public BaseAST {
 public:
-  // FIXME: type should use enum class
+  // TODO: type should use enum class
   std::string type;
   FuncTypeAST(std::string _type) : type(std::move(_type)) {}
   auto dump(int depth) const -> void override;
@@ -93,6 +93,7 @@ public:
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };
 
+//* stmt ast begin
 class StmtAST : public BaseAST {};
 
 class BlockAST : public StmtAST {
@@ -145,8 +146,9 @@ public:
   auto dump(int depth) const -> void override;
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };
+//* stmt ast end
 
-// epxr AST begin
+//* epxr AST begin
 
 class NumberAST : public ExprAST {
 public:
@@ -202,6 +204,6 @@ public:
   auto CalcValue(ir::KoopaBuilder &builder) const -> int override;
 };
 
-// expr AST end
+//* expr AST end
 
 }; // namespace ast
