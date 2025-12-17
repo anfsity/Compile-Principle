@@ -1,6 +1,6 @@
 // src/backend.cpp
-#include "backend.hpp"
-#include "ir_builder.hpp"
+#include "backend/backend.hpp"
+#include "ir/ir_builder.hpp"
 #include "koopa.h"
 #include <cassert>
 #include <fmt/core.h>

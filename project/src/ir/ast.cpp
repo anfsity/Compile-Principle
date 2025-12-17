@@ -1,6 +1,6 @@
 // src/ast.cpp
-#include "ast.hpp"
-#include "ir_builder.hpp"
+#include "ir/ast.hpp"
+#include "ir/ir_builder.hpp"
 #include <cassert>
 #include <fmt/core.h>
 #include <ranges>

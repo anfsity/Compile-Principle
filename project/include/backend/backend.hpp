@@ -1,7 +1,7 @@
 // include/backend.hpp
 #pragma once
 
-#include "ir_builder.hpp"
+#include "ir/ir_builder.hpp"
 #include "koopa.h"
 #include <cassert>
 #include <map>

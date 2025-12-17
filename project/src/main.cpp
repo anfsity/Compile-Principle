@@ -1,7 +1,7 @@
 // src/main.cpp
-#include "ast.hpp"
-#include "backend.hpp"
-#include "ir_builder.hpp"
+#include "ir/ast.hpp"
+#include "backend/backend.hpp"
+#include "ir/ir_builder.hpp"
 #include <cassert>
 #include <cstdio>
 #include <fmt/core.h>

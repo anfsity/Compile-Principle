@@ -7,10 +7,10 @@ PWD := $(shell pwd)
 
 all: build
 
-configure:
+config:
 	cmake -S . -B $(BUILD_DIR)
 
-build: configure
+build: config
 	cmake --build $(BUILD_DIR) -j12
 
 clean:
@@ -22,13 +22,6 @@ shell:
 			-v "$(PWD):$(PWD)" \
 			-w "$(PWD)" \
 			$(IMAGE) bash
-
-run:
-	./cmake-build/compiler -koopa ./tests/hello.c -o debug/hello.koopa
-	./cmake-build/compiler -riscv ./tests/hello.c -o debug/hello.asm
-	./cmake-build/compiler -koopa ./tests/unary.c -o debug/unary.koopa
-	./cmake-build/compiler -koopa ./tests/binary.c -o debug/binary.koopa
-	./cmake-build/compiler -koopa ./tests/logic.c -o debug/logic.koopa
 
 docker-build:
 	docker run --rm \

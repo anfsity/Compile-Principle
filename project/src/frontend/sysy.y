@@ -3,7 +3,7 @@
   #include <memory>
   #include <string>
   // #include <vector>
-  #include "ast.hpp"
+  #include "ir/ast.hpp"
 // code in this will be inserted into sysy.lex.hpp
 }
 
@@ -11,7 +11,7 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "ast.hpp"
+#include "ir/ast.hpp"
 #include <fmt/core.h>
 
 int yylex();
