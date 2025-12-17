@@ -59,7 +59,8 @@ public:
 
 class FuncTypeAST : public BaseAST {
 public:
-  // TODO: type should use enum class
+  // FIXME: type should use enum class
+  //? or we can just use if else statement ?
   std::string type;
   FuncTypeAST(std::string _type) : type(std::move(_type)) {}
   auto dump(int depth) const -> void override;
@@ -159,6 +160,7 @@ public:
   auto CalcValue(ir::KoopaBuilder &builder) const -> int override;
 };
 
+// lval value must be named value
 class LValAST : public ExprAST {
 public:
   std::string ident;

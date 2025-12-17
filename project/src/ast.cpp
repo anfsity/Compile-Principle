@@ -12,24 +12,27 @@ using namespace ast;
 auto indent(int d) -> std::string { return std::string(d * 2, ' '); }
 
 auto opToString(BinaryOp op) -> std::string {
+  // clang-format off
   switch (op) {
   case BinaryOp::Add: return "add";
   case BinaryOp::Sub: return "sub";
   case BinaryOp::Mul: return "mul";
   case BinaryOp::Div: return "div";
   case BinaryOp::Mod: return "mod";
-  case BinaryOp::Lt: return "lt";
-  case BinaryOp::Gt: return "gt";
-  case BinaryOp::Le: return "le";
-  case BinaryOp::Ge: return "ge";
-  case BinaryOp::Eq: return "eq";
-  case BinaryOp::Ne: return "ne";
+  case BinaryOp::Lt:  return "lt";
+  case BinaryOp::Gt:  return "gt";
+  case BinaryOp::Le:  return "le";
+  case BinaryOp::Ge:  return "ge";
+  case BinaryOp::Eq:  return "eq";
+  case BinaryOp::Ne:  return "ne";
   case BinaryOp::And: return "and";
-  case BinaryOp::Or: return "or";
+  case BinaryOp::Or:  return "or";
   default: return "?";
   }
+  // clang-format on
 }
 
+// solve the problem forward declaration
 DeclAST::~DeclAST() = default;
 AssignStmtAST::~AssignStmtAST() = default;
 
@@ -167,6 +170,8 @@ auto FuncDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 }
 
 auto FuncTypeAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
+  // FIXME: type should use enum class
+  //? or we can just use if else statement ?
   std::string return_type;
   if (type == "int")
     return_type = "i32 ";
@@ -184,16 +189,18 @@ auto DeclAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 }
 
 auto DefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
+  //* const btype var = value
   if (isConst) {
     int val = 0;
     if (initVal) {
       val = initVal->CalcValue(builder);
     }
-    builder.getSymtable().define(ident, "", type::IntType::get(), true, val);
+    builder.symtab().define(ident, "", type::IntType::get(), true, val);
   } else {
+    //* btype var = value
     std::string addr = builder.newVar(ident);
     builder.append(fmt::format("  {} = alloc i32\n", addr));
-    builder.getSymtable().define(ident, addr, type::IntType::get(), false);
+    builder.symtab().define(ident, addr, type::IntType::get(), false);
     if (initVal) {
       std::string val_reg = initVal->codeGen(builder);
       builder.append(fmt::format("  store {}, {}\n", val_reg, addr));
@@ -211,6 +218,7 @@ auto BlockAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   return "";
 }
 
+//* return expr
 auto ReturnStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   std::string ret_val;
   if (expr) {
@@ -222,8 +230,9 @@ auto ReturnStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 
 auto AssignStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   std::string val_reg = expr->codeGen(builder);
-  auto sym = builder.getSymtable().lookup(lval->ident);
+  auto sym = builder.symtab().lookup(lval->ident);
   assert(sym && "Assignment to undefined variable");
+  //* lval(sym) = val_reg
   if (sym->isConst) {
     fmt::println(stderr, "Error: Cannot assign to const variable '{}'",
                  sym->name);
@@ -246,8 +255,9 @@ auto NumberAST::codeGen([[maybe_unused]] ir::KoopaBuilder &builder) const
 }
 
 auto LValAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
-  auto sym = builder.getSymtable().lookup(ident);
+  auto sym = builder.symtab().lookup(ident);
   assert(sym && "Undefined variable");
+  //* we can calculate const value in compile time
   if (sym->isConst) {
     return std::to_string(sym->constValue);
   }
@@ -304,7 +314,7 @@ auto NumberAST::CalcValue([[maybe_unused]] ir::KoopaBuilder &builder) const
 }
 
 auto LValAST::CalcValue(ir::KoopaBuilder &builder) const -> int {
-  auto sym = builder.getSymtable().lookup(ident);
+  auto sym = builder.symtab().lookup(ident);
   assert(sym && "Undefined variable in constant expression");
   if (!sym->isConst) {
     throw std::runtime_error("Semantic Error: Variable '" + ident +

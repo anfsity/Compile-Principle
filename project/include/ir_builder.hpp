@@ -11,7 +11,7 @@ private:
   std::string buffer;
   int count_reg = 0;
   int count_name = 0;
-  SymbolTable symtab;
+  SymbolTable _symtab;
 
 public:
   auto append(std::string_view str) -> void { buffer += str; }
@@ -23,9 +23,9 @@ public:
     count_reg = 0;
     count_name = 0;
   }
-  auto getSymtable() -> SymbolTable & { return symtab; }
-  auto enterScope() -> void { symtab.enterScope(); }
-  auto exitScope() -> void { symtab.exitScope(); }
+  auto symtab() -> SymbolTable & { return _symtab; }
+  auto enterScope() -> void { _symtab.enterScope(); }
+  auto exitScope() -> void { _symtab.exitScope(); }
 
   /**
    * @brief Finalizes the construction and retrieves the generated string.

@@ -163,7 +163,9 @@ Stmt
   : RETURN Expr ';' {
     $$ = new ast::ReturnStmtAST($2);
   }
-  | RETURN { $$ = new ast::ReturnStmtAST(nullptr); }
+  | RETURN { 
+    $$ = new ast::ReturnStmtAST(nullptr);
+  }
   | LVal '=' Expr ';' {
     $$ = new ast::AssignStmtAST($1, $3);
   }
