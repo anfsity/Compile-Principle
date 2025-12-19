@@ -16,15 +16,14 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v5
-      - name: List files in the repository
-        run: |
-          ls ${{ github.workspace }}
       - run: pwd
       - name: build compiler
         run: make build
-      - run: autotest -koopa -s lv1 .
-      - run: autotest -koopa -s lv2 .
-      - run: autotest -koopa -s lv3 .
-      - run: autotest -koopa -s lv4 .
-      - run: autotest -koopa -s lv5 .
-      - run: autotest -koopa -s lv6 .
+      - name: test koopa
+        run: |
+          autotest -koopa -s lv1 .
+          autotest -koopa -s lv2 .
+          autotest -koopa -s lv3 .
+          autotest -koopa -s lv4 .
+          autotest -koopa -s lv5 .
+          autotest -koopa -s lv6 .
