@@ -23,6 +23,13 @@ shell:
 			-w "$(PWD)" \
 			$(IMAGE) bash
 
+run:
+	./cmake-build/compiler -koopa ./tests/hello.c -o ./debug/hello.koopa
+	./cmake-build/compiler -riscv ./tests/hello.c -o ./debug/hello.asm
+
+test:
+	cd cmake-build && ctest && cd ..
+
 docker-build:
 	docker run --rm \
 		-u $(UID):$(GID) \

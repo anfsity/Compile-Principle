@@ -1,10 +1,60 @@
 fun @main(): i32 {
 %entry:
-  @x_0 = alloc i32
-  store 10, @x_0
-  %0 = load @x_0
-  %1 = add %0, 1
-  store %1, @x_0
-  %2 = load @x_0
-  ret %2
+  @a_0 = alloc i32
+  store 10, @a_0
+  %0 = load @a_0
+  %1 = gt %0, 1
+  br %1, %then_1, %end_1
+%then_1:
+  %2 = load @a_0
+  %3 = sub %2, 1
+  store %3, @a_0
+  @a_1 = alloc i32
+  store 5, @a_1
+  %4 = load @a_1
+  %5 = sub 0, 1
+  %6 = lt %4, %5
+  br %6, %then_4, %else_4
+%then_4:
+  ret 10
+%else_4:
+  @a_2 = alloc i32
+  store 98, @a_2
+  jump %end_4
+%end_4:
+  jump %end_1
+%end_1:
+  %7 = load @a_1
+  %8 = eq %7, 9
+  br %8, %then_6, %end_6
+%then_6:
+  @b_3 = alloc i32
+  %9 = load @a_1
+  %10 = sub %9, 1
+  store %10, @b_3
+  @a_4 = alloc i32
+  %11 = load @b_3
+  %12 = sub %11, 1
+  store %12, @a_4
+  %13 = load @a_4
+  %14 = load @b_3
+  %15 = ne %13, %14
+  br %15, %then_10, %else_10
+%then_10:
+  %16 = load @a_4
+  %17 = eq 0, %16
+  br %17, %then_11, %end_11
+%then_11:
+  ret 0
+%end_11:
+  %18 = load @a_4
+  ret %18
+%else_10:
+  %19 = load @b_3
+  ret %19
+%end_10:
+  jump %end_6
+%end_6:
+  %20 = sub 0, 1
+  ret %20
 }

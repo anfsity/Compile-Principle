@@ -48,12 +48,12 @@ ConstExp      ::= Exp;
  */
 
 // terminal letters are written in uppercase.
-%token VOID INT RETURN OR AND EQ NE LE GE PRIORITY CONST
+%token VOID INT RETURN OR AND EQ NE LE GE PRIORITY CONST IF ELSE
 %token <str_val> IDENT
 %token <int_val> INT_CONST
 
 %type <str_val> Btype
-%type <ast_val> FuncDef FuncType Block Stmt Number Expr LVal
+%type <ast_val> FuncDef Block Stmt Number Expr LVal OpenStmt CloseStmt
 %type <ast_val> ConstDef VarDef BlockItem Decl ConstDecl VarDecl
 %type <items_val> BlockItemList
 %type <defs_val> VarDefList ConstDefList
@@ -75,14 +75,11 @@ CompUnit
   };
 
 FuncDef
-  : FuncType IDENT '(' ')' Block {
-    $$ = new ast::FuncDefAST($1, std::move(*$2), $5);
+  : Btype IDENT '(' ')' Block {
+    auto ast = new ast::FuncTypeAST(std::move(*$1));
+    $$ = new ast::FuncDefAST(ast, std::move(*$2), $5);
+    delete $1;
     delete $2;
-  };
-
-FuncType
-  : INT {
-    $$ = new ast::FuncTypeAST("int");
   };
 
 Block
@@ -160,7 +157,18 @@ Btype
   | VOID { $$ = new std::string("void"); };
 
 Stmt
-  : RETURN Expr ';' {
+  : OpenStmt {
+    $$ = $1;
+  }
+  | CloseStmt {
+    $$ = $1;
+  };
+
+CloseStmt
+  : IF '(' Expr ')' CloseStmt ELSE CloseStmt {
+    $$ = new ast::IfStmtAST($3, $5, $7);
+  }
+  | RETURN Expr ';' {
     $$ = new ast::ReturnStmtAST($2);
   }
   | RETURN { 
@@ -177,7 +185,15 @@ Stmt
   }
   | ';' {
     $$ = new ast::ExprStmtAST(nullptr);
+  };
+
+OpenStmt
+  : IF '(' Expr ')' Stmt {
+    $$ = new ast::IfStmtAST($3, $5, nullptr);
   }
+  | IF '(' Expr ')' CloseStmt ELSE OpenStmt {
+    $$ = new ast::IfStmtAST($3, $5, $7);
+  };
 
 Expr
   : Number { $$ = $1; }

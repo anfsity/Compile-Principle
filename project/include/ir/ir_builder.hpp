@@ -11,14 +11,21 @@ private:
   std::string buffer;
   int count_reg = 0;
   int count_name = 0;
+  int count_label = 0;
   SymbolTable _symtab;
 
 public:
   auto append(std::string_view str) -> void { buffer += str; }
   auto newReg() -> std::string { return fmt::format("%{}", count_reg++); }
-  auto newVar(std::string ident) -> std::string {
+  auto newVar(std::string_view ident) -> std::string {
     return fmt::format("@{}_{}", ident, count_name++);
   };
+  auto newLabel(std::string_view prefix) -> std::string {
+    return fmt::format("%{}_{}", prefix, count_label);
+  }
+  auto add_label() -> void {
+    count_label++;
+  }
   auto reset() -> void {
     count_reg = 0;
     count_name = 0;

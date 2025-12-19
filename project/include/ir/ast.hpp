@@ -3,6 +3,7 @@
 
 #include "ir_builder.hpp"
 #include "symbol_table.hpp"
+#include <cassert>
 #include <fmt/core.h>
 #include <memory>
 #include <string>
@@ -89,6 +90,9 @@ public:
     if (_initVal) {
       initVal.reset(static_cast<ExprAST *>(_initVal));
     }
+    if (ident == "void") {
+      assert(false && "can't declare void type variable");
+    }
   }
   auto dump(int depth) const -> void override;
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
@@ -143,6 +147,20 @@ public:
     if (_expr) {
       expr.reset(static_cast<ExprAST *>(_expr));
     }
+  }
+  auto dump(int depth) const -> void override;
+  auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
+};
+
+class IfStmtAST : public StmtAST {
+public:
+  std::unique_ptr<ExprAST> cond;
+  std::unique_ptr<StmtAST> thenS;
+  std::unique_ptr<StmtAST> elseS;
+  IfStmtAST(BaseAST *_cond, BaseAST *_thenS, BaseAST *_elseS) {
+      cond.reset(static_cast<ExprAST *>(_cond));
+      thenS.reset(static_cast<StmtAST *>(_thenS));
+      elseS.reset(static_cast<StmtAST *>(_elseS));
   }
   auto dump(int depth) const -> void override;
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;

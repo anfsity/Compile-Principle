@@ -16,6 +16,7 @@ struct Symbol {
   std::shared_ptr<type::Type> type;
   bool isConst;
   int constValue;
+  int varValue;
 };
 
 class SymbolTable {
@@ -41,7 +42,7 @@ public:
       throw std::runtime_error("Semantic Error: Redefinition of " + name);
     }
 
-    Symbol sym{name, irName, type, isConst, val};
+    Symbol sym{name, irName, type, isConst, val, 0};
     scopes.back()[name] = sym;
   }
 
