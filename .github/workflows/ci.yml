@@ -21,6 +21,7 @@ jobs:
           ls ${{ github.workspace }}
       - run: echo "🍏 This job's status is ${{ job.status }}."
       - run: docker run maxxing/compiler-dev ls -l /
+      - run: cd project
       - run: make shell
       - run: autotest -koopa -s lv1 .
       - run: autotest -koopa -s lv2 .
