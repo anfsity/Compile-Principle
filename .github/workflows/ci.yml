@@ -8,6 +8,8 @@ on:
 jobs:
   Explore-GitHub-Actions:
     runs-on: ubuntu-latest
+    container:
+      image: maxxing/compiler-dev
     defaults:
       run:
         working-directory: ./project
@@ -18,8 +20,8 @@ jobs:
         run: |
           ls ${{ github.workspace }}
       - run: pwd
-      - run: make shell
-      - run: make build
+      - name: build compiler
+        run: make build
       - run: autotest -koopa -s lv1 .
       - run: autotest -koopa -s lv2 .
       - run: autotest -koopa -s lv3 .
