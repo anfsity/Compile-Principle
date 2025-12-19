@@ -53,10 +53,13 @@ ConstExp      ::= Exp;
 %token <int_val> INT_CONST
 
 %type <str_val> Btype
-%type <ast_val> FuncDef Block Stmt Number Expr LVal OpenStmt CloseStmt
+%type <ast_val> FuncDef Block Stmt Number Expr LVal
 %type <ast_val> ConstDef VarDef BlockItem Decl ConstDecl VarDecl
 %type <items_val> BlockItemList
 %type <defs_val> VarDefList ConstDefList
+
+%nonassoc LOWER_ELSE
+%nonassoc ELSE
 
 %left OR                  // ||
 %left AND                 // &&
@@ -157,24 +160,7 @@ Btype
   | VOID { $$ = new std::string("void"); };
 
 Stmt
-  : OpenStmt {
-    $$ = $1;
-  }
-  | CloseStmt {
-    $$ = $1;
-  };
-
-CloseStmt
-  : IF '(' Expr ')' CloseStmt ELSE CloseStmt {
-    $$ = new ast::IfStmtAST($3, $5, $7);
-  }
-  | RETURN Expr ';' {
-    $$ = new ast::ReturnStmtAST($2);
-  }
-  | RETURN { 
-    $$ = new ast::ReturnStmtAST(nullptr);
-  }
-  | LVal '=' Expr ';' {
+  : LVal '=' Expr ';' {
     $$ = new ast::AssignStmtAST($1, $3);
   }
   | Block {
@@ -185,13 +171,17 @@ CloseStmt
   }
   | ';' {
     $$ = new ast::ExprStmtAST(nullptr);
-  };
-
-OpenStmt
-  : IF '(' Expr ')' Stmt {
+  }
+  | RETURN Expr ';' {
+    $$ = new ast::ReturnStmtAST($2);
+  }
+  | RETURN ';' {
+    $$ = new ast::ReturnStmtAST(nullptr);
+  }
+  | IF '(' Expr ')' Stmt %prec LOWER_ELSE {
     $$ = new ast::IfStmtAST($3, $5, nullptr);
   }
-  | IF '(' Expr ')' CloseStmt ELSE OpenStmt {
+  | IF '(' Expr ')' Stmt ELSE Stmt {
     $$ = new ast::IfStmtAST($3, $5, $7);
   };
 
