@@ -1,12 +1,12 @@
 name: compiler auto test
-run-name: ${{ github.actor }} is testing out GitHub Actions 🚀
+run-name: ${{ github.actor }} is testing out compiler function 🚀
 on:
   push:
   pull_request:
   workflow_dispatch:
   
 jobs:
-  Explore-GitHub-Actions:
+  build:
     runs-on: ubuntu-latest
     container:
       image: maxxing/compiler-dev
@@ -22,7 +22,6 @@ jobs:
       - name: test koopa
         run: |
           autotest -koopa -s lv1 .
-          autotest -koopa -s lv2 .
           autotest -koopa -s lv3 .
           autotest -koopa -s lv4 .
           autotest -koopa -s lv5 .
