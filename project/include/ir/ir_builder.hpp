@@ -12,6 +12,7 @@ private:
   int count_reg = 0;
   int count_name = 0;
   int count_label = 0;
+  bool _is_block_closed = false;
   SymbolTable _symtab;
 
 public:
@@ -20,16 +21,26 @@ public:
   auto newVar(std::string_view ident) -> std::string {
     return fmt::format("@{}_{}", ident, count_name++);
   };
-  auto newLabel(std::string_view prefix) -> std::string {
-    return fmt::format("%{}_{}", prefix, count_label);
+
+  auto allocLabelId() -> int { return count_label++; }
+  auto newLabel(std::string_view prefix, int id) -> std::string {
+    return fmt::format("%{}_{}", prefix, id);
   }
-  auto add_label() -> void {
-    count_label++;
+  auto allocUniqueLabel(std::string_view prefix) -> std::string {
+    return newLabel(prefix, allocLabelId());
   }
+
+  auto isBlockClose() -> bool { return _is_block_closed; }
+  auto setBlockClose() -> void { _is_block_closed = true; }
+  auto clearBlockClose() -> void { _is_block_closed = false; }
+
   auto reset() -> void {
     count_reg = 0;
     count_name = 0;
+    count_label = 0;
+    _is_block_closed = false;
   }
+
   auto symtab() -> SymbolTable & { return _symtab; }
   auto enterScope() -> void { _symtab.enterScope(); }
   auto exitScope() -> void { _symtab.exitScope(); }

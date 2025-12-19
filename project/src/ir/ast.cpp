@@ -225,16 +225,14 @@ auto DefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 
 auto BlockAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   builder.enterScope();
-  std::string res;
   for (const auto &item : items) {
-    res = item->codeGen(builder);
-    if (res == "ret") {
-      builder.exitScope();
-      return res;
+    if (builder.isBlockClose()) {
+      continue;
     }
+    item->codeGen(builder);
   }
   builder.exitScope();
-  return res;
+  return "";
 }
 
 //* return expr
@@ -243,8 +241,9 @@ auto ReturnStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   if (expr) {
     ret_val = expr->codeGen(builder);
   }
+  builder.setBlockClose();
   builder.append(fmt::format("  ret {}\n", ret_val));
-  return "ret";
+  return "";
 }
 
 auto AssignStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
@@ -270,10 +269,10 @@ auto ExprStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 
 auto IfStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   std::string cond_reg = cond->codeGen(builder);
-  std::string then_label = builder.newLabel("then");
-  std::string else_label = builder.newLabel("else");
-  std::string end_label = builder.newLabel("end");
-  builder.add_label();
+  int id = builder.allocLabelId();
+  std::string then_label = builder.newLabel("then", id);
+  std::string else_label = builder.newLabel("else", id);
+  std::string end_label = builder.newLabel("end", id);
   if (elseS) {
     builder.append(
         fmt::format("  br {}, {}, {}\n", cond_reg, then_label, else_label));
@@ -281,29 +280,31 @@ auto IfStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     builder.append(
         fmt::format("  br {}, {}, {}\n", cond_reg, then_label, end_label));
   }
-  std::string res;
+
   // not jump
   builder.append(fmt::format("{}:\n", then_label));
-  res = thenS->codeGen(builder);
-  if (res != "ret") {
+  builder.clearBlockClose();
+  thenS->codeGen(builder);
+  if (!builder.isBlockClose()) {
     builder.append(fmt::format("  jump {}\n", end_label));
   }
+
   // jump
   if (elseS) {
     builder.append(fmt::format("{}:\n", else_label));
-    res = elseS->codeGen(builder);
-    if (res != "ret") {
+    builder.clearBlockClose();
+    elseS->codeGen(builder);
+    if (!builder.isBlockClose()) {
       builder.append(fmt::format("  jump {}\n", end_label));
     }
   }
   builder.append(fmt::format("{}:\n", end_label));
+  builder.clearBlockClose();
   return "";
 }
 
 auto NumberAST::codeGen([[maybe_unused]] ir::KoopaBuilder &builder) const
     -> std::string {
-  // fmt::println("[Debug] I'm number ast's codegen");
-  // builder.append(fmt::format("[Debug] i'm number ast's codegen"));
   return std::to_string(val);
 }
 
@@ -337,15 +338,15 @@ auto UnaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 }
 
 auto BinaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
-  // FIXME: short-circuit evaluation not implemented
   if (op == BinaryOp::And) {
     std::string tmp_addr = builder.newVar("and_res");
     builder.append(fmt::format("  {} = alloc i32\n", tmp_addr));
 
     std::string lhs_reg = lhs->codeGen(builder);
-    std::string true_label = builder.newLabel("and_true");
-    std::string false_label = builder.newLabel("and_false");
-    std::string end_label = builder.newLabel("and_end");
+    int id = builder.allocLabelId();
+    std::string true_label = builder.newLabel("and_true", id);
+    std::string false_label = builder.newLabel("and_false", id);
+    std::string end_label = builder.newLabel("and_end", id);
 
     std::string lhs_bool = builder.newReg();
     builder.append(fmt::format("  {} = ne {}, 0\n", lhs_bool, lhs_reg));
@@ -370,8 +371,6 @@ auto BinaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     std::string ret_reg = builder.newReg();
     builder.append(fmt::format("  {} = load {}\n", ret_reg, tmp_addr));
 
-    // count_label
-    builder.add_label();
     return ret_reg;
   }
   if (op == BinaryOp::Or) {
@@ -379,9 +378,11 @@ auto BinaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     builder.append(fmt::format("  {} = alloc i32\n", tmp_addr));
 
     std::string lhs_reg = lhs->codeGen(builder);
-    std::string true_label = builder.newLabel("or_true");
-    std::string false_label = builder.newLabel("or_false");
-    std::string end_label = builder.newLabel("or_end");
+
+    int id = builder.allocLabelId();
+    std::string true_label = builder.newLabel("or_true", id);
+    std::string false_label = builder.newLabel("or_false", id);
+    std::string end_label = builder.newLabel("or_end", id);
 
     std::string lhs_bool = builder.newReg();
     builder.append(fmt::format("  {} = ne {}, 0\n", lhs_bool, lhs_reg));
@@ -406,17 +407,15 @@ auto BinaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     std::string ret_reg = builder.newReg();
     builder.append(fmt::format("  {} = load {}\n", ret_reg, tmp_addr));
 
-    // count_label++
-    builder.add_label();
     return ret_reg;
   }
+  // remain binary operator
   std::string lhs_reg = lhs->codeGen(builder);
   std::string rhs_reg = rhs->codeGen(builder);
   std::string ret_reg = builder.newReg();
   std::string ir_op = opToString(op);
   builder.append(
       fmt::format("  {} = {} {}, {}\n", ret_reg, ir_op, lhs_reg, rhs_reg));
-  builder.add_label();
   return ret_reg;
 }
 
