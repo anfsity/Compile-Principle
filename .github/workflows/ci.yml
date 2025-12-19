@@ -16,9 +16,6 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v5
-      - run: pwd
-      - name: build compiler
-        run: make build
       - name: test koopa
         run: |
           autotest -koopa -s lv1 .
@@ -26,3 +23,10 @@ jobs:
           autotest -koopa -s lv4 .
           autotest -koopa -s lv5 .
           autotest -koopa -s lv6 .
+      - name: test riscv
+        run: |
+          autotest -riscv -s lv1 .
+          autotest -riscv -s lv3 .
+          autotest -riscv -s lv4 .
+          autotest -riscv -s lv5 .
+          autotest -riscv -s lv6 .

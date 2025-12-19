@@ -75,7 +75,7 @@ auto TargetCodeGen::visit(koopa_raw_function_t func) -> void {
 
 auto TargetCodeGen::visit(koopa_raw_basic_block_t bb) -> void {
   if (bb->name) {
-    buffer += fmt::format(".{}:\n", bb->name + 1);
+    buffer += fmt::format("{}:\n", bb->name + 1);
   }
   for (const auto inst : make_span<koopa_raw_value_t>(bb->insts)) {
     visit(inst);
@@ -91,7 +91,19 @@ auto TargetCodeGen::visit(koopa_raw_value_t value) -> void {
   case KOOPA_RVT_STORE:   visit(kind.data.store);     break;
   case KOOPA_RVT_ALLOC:   /* nothing to do */                break;
   // clang-format on
-  case KOOPA_RVT_BINARY:
+  // FIXME:
+  case KOOPA_RVT_BRANCH: {
+    // buffer += fmt::format("[Debug] this is branch inst.\n");
+    visit(kind.data.branch);
+    break;
+  }
+  // FIXME:
+  case KOOPA_RVT_JUMP: {
+    // buffer += "[Debug] this is jump inst\n";
+    visit(kind.data.jump);
+    break;
+  }
+  case KOOPA_RVT_BINARY: {
     visit(kind.data.binary);
     // KOOPA_RTT_UNIT : Unit (void).
     if (value->ty->tag != KOOPA_RTT_UNIT) {
@@ -100,7 +112,8 @@ auto TargetCodeGen::visit(koopa_raw_value_t value) -> void {
       buffer += fmt::format("  sw t0, {}(sp)\n", offset);
     }
     break;
-  case KOOPA_RVT_LOAD:
+  }
+  case KOOPA_RVT_LOAD: {
     visit(kind.data.load);
     // KOOPA_RTT_UNIT : Unit (void).
     if (value->ty->tag != KOOPA_RTT_UNIT) {
@@ -109,8 +122,20 @@ auto TargetCodeGen::visit(koopa_raw_value_t value) -> void {
       buffer += fmt::format("  sw t0, {}(sp)\n", offset);
     }
     break;
+  }
   default: assert(false);
   }
+}
+
+auto TargetCodeGen::visit(const koopa_raw_branch_t &branch) -> void {
+  load_to(branch.cond, "t0");
+  buffer += fmt::format("  bnez t0, {}\n", branch.true_bb->name + 1);
+  buffer += fmt::format("  j {}\n", branch.false_bb->name + 1);
+}
+
+auto TargetCodeGen::visit(const koopa_raw_jump_t &jump) -> void {
+  std::string target_name = jump.target->name + 1;
+  buffer += fmt::format("  j {}\n", target_name);
 }
 
 auto TargetCodeGen::visit(const koopa_raw_load_t &load) -> void {
