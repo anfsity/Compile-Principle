@@ -135,6 +135,16 @@ auto IfStmtAST::dump(int depth) const -> void {
   }
 }
 
+auto WhileStmtAST::dump(int depth) const -> void {
+  fmt::println("{}WhileStmtAST:", indent(depth));
+  if (cond) {
+    cond->dump(depth + 1);
+  }
+  if (body) {
+    body->dump(depth + 1);
+  }
+}
+
 auto NumberAST::dump(int depth) const -> void {
   fmt::println("{}NumberAST: {}", indent(depth), val);
 }
@@ -298,6 +308,30 @@ auto IfStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
       builder.append(fmt::format("  jump {}\n", end_label));
     }
   }
+  builder.append(fmt::format("{}:\n", end_label));
+  builder.clearBlockClose();
+  return "";
+}
+
+auto WhileStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
+  int id = builder.allocLabelId();
+  std::string entry_label = builder.newLabel("while_entry", id);
+  std::string body_label = builder.newLabel("while_body", id);
+  std::string end_label = builder.newLabel("while_end", id);
+  builder.append(fmt::format("  jump {}\n", entry_label));
+
+  builder.append(fmt::format("{}:\n", entry_label));
+  std::string cond_reg = cond->codeGen(builder);
+  builder.append(
+      fmt::format("  br {}, {}, {}\n", cond_reg, body_label, end_label));
+
+  builder.append(fmt::format("{}:\n", body_label));
+  if (body) {
+    builder.clearBlockClose();
+    body->codeGen(builder);
+  }
+  builder.append(fmt::format("  jump {}\n", entry_label));
+
   builder.append(fmt::format("{}:\n", end_label));
   builder.clearBlockClose();
   return "";

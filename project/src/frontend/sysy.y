@@ -2,7 +2,6 @@
 %code requires {
   #include <memory>
   #include <string>
-  // #include <vector>
   #include "ir/ast.hpp"
 // code in this will be inserted into sysy.lex.hpp
 }
@@ -31,7 +30,7 @@ void yyerror(std::unique_ptr<ast::BaseAST> &ast, const char *str);
   std::vector<std::unique_ptr<ast::DefAST>> *defs_val;
 }
 
-/**
+/*
 Decl          ::= ConstDecl;
 ConstDecl     ::= "const" BType ConstDef {"," ConstDef} ";";
 BType         ::= "int";
@@ -48,7 +47,7 @@ ConstExp      ::= Exp;
  */
 
 // terminal letters are written in uppercase.
-%token VOID INT RETURN OR AND EQ NE LE GE PRIORITY CONST IF ELSE
+%token VOID INT RETURN OR AND EQ NE LE GE PRIORITY CONST IF ELSE WHILE
 %token <str_val> IDENT
 %token <int_val> INT_CONST
 
@@ -169,6 +168,9 @@ Stmt
   | Expr ';' {
     $$ = new ast::ExprStmtAST($1);
   }
+  | WHILE '(' Expr ')' Stmt {
+    $$ = new ast::WhileStmtAST($3, $5);
+  }
   | ';' {
     $$ = new ast::ExprStmtAST(nullptr);
   }
@@ -193,7 +195,7 @@ Expr
   | '!' Expr {
     $$ = new ast::UnaryExprAST(ast::UnaryOp::Not, $2);
   }
-  | '+' Expr %prec PRIORITY{
+  | '+' Expr %prec PRIORITY {
     $$ = $2;
   }
   | '-' Expr %prec PRIORITY {

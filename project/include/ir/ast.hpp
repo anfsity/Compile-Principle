@@ -158,9 +158,21 @@ public:
   std::unique_ptr<StmtAST> thenS;
   std::unique_ptr<StmtAST> elseS;
   IfStmtAST(BaseAST *_cond, BaseAST *_thenS, BaseAST *_elseS) {
-      cond.reset(static_cast<ExprAST *>(_cond));
-      thenS.reset(static_cast<StmtAST *>(_thenS));
-      elseS.reset(static_cast<StmtAST *>(_elseS));
+    cond.reset(static_cast<ExprAST *>(_cond));
+    thenS.reset(static_cast<StmtAST *>(_thenS));
+    elseS.reset(static_cast<StmtAST *>(_elseS));
+  }
+  auto dump(int depth) const -> void override;
+  auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
+};
+
+class WhileStmtAST : public StmtAST {
+public:
+  std::unique_ptr<ExprAST> cond;
+  std::unique_ptr<StmtAST> body;
+  WhileStmtAST(BaseAST *_cond, BaseAST *_body) {
+    cond.reset(static_cast<ExprAST *>(_cond));
+    body.reset(static_cast<StmtAST *>(_body));
   }
   auto dump(int depth) const -> void override;
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
