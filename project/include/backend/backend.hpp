@@ -14,7 +14,6 @@ private:
   koopa_raw_program_builder_t builder;
 
 public:
-  // I think koopawrapper should receive ir instead of koopabuilder ...
   KoopaWrapper(const std::string &IR) {
     koopa_error_code_t ret = koopa_parse_from_string(IR.c_str(), &program);
     assert(ret == KOOPA_EC_SUCCESS && "parsing koopa ir failure");

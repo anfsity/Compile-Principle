@@ -29,9 +29,9 @@ public:
   auto enterScope() -> void { scopes.push_back({}); }
 
   auto exitScope() -> void {
-    // clang-format off
-      if (!scopes.empty()) scopes.pop_back();
-    // clang-format on
+    if (!scopes.empty()) {
+      scopes.pop_back();
+    }
   }
 
   auto define(const std::string &name, const std::string &irName,
@@ -46,7 +46,7 @@ public:
     scopes.back()[name] = sym;
   }
 
-  auto lookup(const std::string &name) -> Symbol* {
+  auto lookup(const std::string &name) -> Symbol * {
     for (auto &scope : std::views::reverse(scopes)) {
       auto it = scope.find(name);
       if (it != scope.end()) {
