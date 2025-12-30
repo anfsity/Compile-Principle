@@ -145,6 +145,14 @@ auto WhileStmtAST::dump(int depth) const -> void {
   }
 }
 
+auto BreakStmtAST::dump(int depth) const -> void {
+  fmt::println("{}BreakAST", indent(depth));
+}
+
+auto ContinueStmtAST::dump(int depth) const -> void {
+  fmt::println("{}ContinueAST", indent(depth));
+}
+
 auto NumberAST::dump(int depth) const -> void {
   fmt::println("{}NumberAST: {}", indent(depth), val);
 }
@@ -226,7 +234,7 @@ auto DefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     builder.symtab().define(ident, addr, type::IntType::get(), false);
     if (initVal) {
       std::string val_reg = initVal->codeGen(builder);
-      builder.symtab().lookup(ident)->varValue = initVal->CalcValue(builder);
+      // builder.symtab().lookup(ident)->varValue = initVal->CalcValue(builder);
       builder.append(fmt::format("  store {}, {}\n", val_reg, addr));
     }
   }
@@ -309,6 +317,7 @@ auto IfStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     }
   }
   builder.append(fmt::format("{}:\n", end_label));
+  // every basic block (entry) need to pair a block close.
   builder.clearBlockClose();
   return "";
 }
@@ -318,6 +327,7 @@ auto WhileStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   std::string entry_label = builder.newLabel("while_entry", id);
   std::string body_label = builder.newLabel("while_body", id);
   std::string end_label = builder.newLabel("while_end", id);
+  builder.pushLoop(entry_label, end_label);
   builder.append(fmt::format("  jump {}\n", entry_label));
 
   builder.append(fmt::format("{}:\n", entry_label));
@@ -330,10 +340,27 @@ auto WhileStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     builder.clearBlockClose();
     body->codeGen(builder);
   }
-  builder.append(fmt::format("  jump {}\n", entry_label));
+  if (!builder.isBlockClose()) {
+    builder.append(fmt::format("  jump {}\n", entry_label));
+  }
 
   builder.append(fmt::format("{}:\n", end_label));
+  builder.popLoop();
   builder.clearBlockClose();
+  return "";
+}
+
+auto BreakStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
+  auto target = builder.getBreakTarget();
+  builder.append(fmt::format("  jump {}\n", target));
+  builder.setBlockClose();
+  return "";
+}
+
+auto ContinueStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
+  auto target = builder.getContinueTarget();
+  builder.append(fmt::format("  jump {}\n", target));
+  builder.setBlockClose();
   return "";
 }
 
@@ -469,7 +496,8 @@ auto LValAST::CalcValue(ir::KoopaBuilder &builder) const -> int {
   if (sym->isConst) {
     return sym->constValue;
   }
-  return sym->varValue;
+  // return sym->varValue;
+  return 0;
 }
 
 auto UnaryExprAST::CalcValue(ir::KoopaBuilder &builder) const -> int {

@@ -47,7 +47,7 @@ ConstExp      ::= Exp;
  */
 
 // terminal letters are written in uppercase.
-%token VOID INT RETURN OR AND EQ NE LE GE PRIORITY CONST IF ELSE WHILE
+%token VOID INT RETURN OR AND EQ NE LE GE PRIORITY CONST IF ELSE WHILE BREAK CONTINUE
 %token <str_val> IDENT
 %token <int_val> INT_CONST
 
@@ -115,6 +115,7 @@ ConstDecl
 ConstDefList
   : ConstDef {
     $$ = new std::vector<std::unique_ptr<ast::DefAST>>();
+    // this is a pointer , so we don't need move optimize.
     $$->push_back(std::unique_ptr<ast::DefAST>(static_cast<ast::DefAST *>($1)));
   }
   | ConstDefList ',' ConstDef {
@@ -132,7 +133,7 @@ VarDecl
   : Btype VarDefList ';' {
     $$ = new ast::DeclAST(false, std::move(*$1), $2);
     delete $1;
-  }
+  };
 
 VarDefList
   : VarDef {
@@ -168,9 +169,6 @@ Stmt
   | Expr ';' {
     $$ = new ast::ExprStmtAST($1);
   }
-  | WHILE '(' Expr ')' Stmt {
-    $$ = new ast::WhileStmtAST($3, $5);
-  }
   | ';' {
     $$ = new ast::ExprStmtAST(nullptr);
   }
@@ -179,6 +177,15 @@ Stmt
   }
   | RETURN ';' {
     $$ = new ast::ReturnStmtAST(nullptr);
+  }
+  | BREAK ';' {
+    $$ = new ast::BreakStmtAST();
+  }
+  | CONTINUE ';' {
+    $$ = new ast::ContinueStmtAST();
+  }
+  | WHILE '(' Expr ')' Stmt {
+    $$ = new ast::WhileStmtAST($3, $5);
   }
   | IF '(' Expr ')' Stmt %prec LOWER_ELSE {
     $$ = new ast::IfStmtAST($3, $5, nullptr);

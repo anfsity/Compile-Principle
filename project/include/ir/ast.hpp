@@ -177,6 +177,18 @@ public:
   auto dump(int depth) const -> void override;
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };
+
+class BreakStmtAST : public StmtAST {
+public:
+  auto dump(int depth) const -> void override;
+  auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
+};
+
+class ContinueStmtAST : public StmtAST {
+public:
+  auto dump(int depth) const -> void override;
+  auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
+};
 //* stmt ast end
 
 //* epxr AST begin
