@@ -194,9 +194,21 @@ auto FuncDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   }
   if (block) {
     builder.append("{\n%entry:\n");
+    builder.clearBlockClose();
     block->codeGen(builder);
-    builder.append("}\n");
+    // e.g. int main() { int a; }
+    // there is no return value.
+    if (!builder.isBlockClose()) {
+      bool is_void = (funcType && static_cast<FuncTypeAST *>(funcType.get())->type == "void");
+      if (is_void) {
+        builder.append("  ret\n");
+      } else {
+        builder.append("  ret 0\n");
+      }
+      builder.setBlockClose();
+    }
   }
+  builder.append("}\n");
   return "";
 }
 
@@ -234,7 +246,6 @@ auto DefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     builder.symtab().define(ident, addr, type::IntType::get(), false);
     if (initVal) {
       std::string val_reg = initVal->codeGen(builder);
-      // builder.symtab().lookup(ident)->varValue = initVal->CalcValue(builder);
       builder.append(fmt::format("  store {}, {}\n", val_reg, addr));
     }
   }
@@ -496,7 +507,6 @@ auto LValAST::CalcValue(ir::KoopaBuilder &builder) const -> int {
   if (sym->isConst) {
     return sym->constValue;
   }
-  // return sym->varValue;
   return 0;
 }
 
