@@ -5,3 +5,7 @@
 [submodule "online-doc"]
     path = online-doc
     url = https://github.com/pku-minic/online-doc.git
+
+[submodule "sysy-runtime-lib"]
+    path = sysy-runtime-lib
+    url = https://github.com/pku-minic/sysy-runtime-lib.git

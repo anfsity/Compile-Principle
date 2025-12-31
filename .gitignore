@@ -1,4 +1,5 @@
 /project/cmake-build/
+/project/debug/
 .vscode
 .clangd
 GEMINI.md
