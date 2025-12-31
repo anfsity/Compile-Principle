@@ -2,5 +2,5 @@
   .globl main
 main:
 entry:
-  li a0, 0
+  li a0, 3
   ret
