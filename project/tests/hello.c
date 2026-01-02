@@ -1,3 +1,10 @@
 int main() {
-    return 3;
+  int x = getint();
+  int y = getint();
+  putint(x + y);
+  int c = getch();
+  putch(c);
+  putch(33);
+  putch(10);
+  return 0;
 }

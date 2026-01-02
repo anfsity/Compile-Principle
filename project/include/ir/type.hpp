@@ -15,6 +15,7 @@ public:
   virtual auto is_void() const -> bool { return false; }
   virtual auto is_ptr() const -> bool { return false; }
   virtual auto is_bool() const -> bool { return false; }
+  virtual auto is_float() const -> bool { return false; }
 };
 
 class IntType : public Type {
@@ -43,6 +44,16 @@ public:
   auto is_bool() const -> bool override { return true; }
   static auto get() -> std::shared_ptr<BoolType> {
     static auto instance = std::make_shared<BoolType>();
+    return instance;
+  }
+};
+
+class FloatType : public Type {
+public:
+  auto debug() const -> std::string override { return "float"; }
+  auto is_float() const -> bool override { return true; }
+  static auto get() -> std::shared_ptr<FloatType> {
+    static auto instance = std::make_shared<FloatType>();
     return instance;
   }
 };
