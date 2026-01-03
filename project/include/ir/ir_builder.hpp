@@ -1,6 +1,7 @@
 // include/ir_builder.hpp
 #pragma once
 
+#include "Log/log.hpp"
 #include "symbol_table.hpp"
 #include <fmt/core.h>
 #include <string>
@@ -83,18 +84,14 @@ public:
 
   auto getBreakTarget() -> std::string_view {
     if (loopstk.empty()) {
-      fmt::println(stderr,
-                   "Semantic Error: 'break' statement not within loop.");
-      std::abort();
+      Log::panic("Semantic Error: 'break' statement not within loop.");
     }
     return loopstk.back().breakTarget;
   }
 
   auto getContinueTarget() -> std::string_view {
     if (loopstk.empty()) {
-      fmt::println(stderr,
-                   "Semantic Error: 'continue' statement not within loop.");
-      std::abort();
+      Log::panic("Semantic Error: 'continue' statement not within loop.");
     }
     return loopstk.back().continueTarget;
   }

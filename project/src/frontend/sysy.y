@@ -10,8 +10,9 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "ir/ast.hpp"
 #include <fmt/core.h>
+#include "ir/ast.hpp"
+#include "Log/log.hpp"
 
 using namespace ast;
 int yylex();
@@ -345,6 +346,6 @@ FuncRParams
 %%
 
 void yyerror(std::unique_ptr<BaseAST> &ast, const char *str) {
-  fmt::println(stderr, "{}", str);
+  Log::panic(str);
   if(ast) ast->dump(0);
 }

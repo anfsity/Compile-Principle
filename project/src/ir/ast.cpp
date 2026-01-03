@@ -1,5 +1,6 @@
 // src/ast.cpp
 #include "ir/ast.hpp"
+#include "Log/log.hpp"
 #include "ir/ir_builder.hpp"
 #include <cassert>
 #include <fmt/core.h>
@@ -33,15 +34,6 @@ auto opToString(BinaryOp op) -> std::string {
   }
   // clang-format on
 }
-
-// auto panic(std::string_view msg,
-//            const std::source_location &loc = std::source_location::current()) {
-//   throw std::runtime_error(fmt::format("[Error]: {}\n  at {}:{}:{}\n",
-//                                        msg,
-//                                        loc.file_name(),
-//                                        loc.line(),
-//                                        loc.function_name()));
-// }
 
 // solve the problem forward declaration
 DeclAST::~DeclAST() = default;
@@ -211,8 +203,7 @@ auto CompUnitAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 
 auto FuncParamAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   if (btype == "void") {
-    throw std::runtime_error(
-        "Semantic Error: Variable cannot be of type 'void'");
+    Log::panic("Semantic Error: Variable cannot be of type 'void'");
   }
   if (isConst) {
     builder.symtab().define(ident, "", type::IntType::get(), SymbolKind::Var,
@@ -284,8 +275,7 @@ auto FuncDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 
 auto DeclAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   if (btype == "void") {
-    throw std::runtime_error(
-        "Semantic Error: Variable cannot be of type 'void'");
+    Log::panic("Semantic Error: Variable cannot be of type 'void'");
   }
   for (const auto &def : defs) {
     def->codeGen(builder);
@@ -335,7 +325,7 @@ auto DefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 auto FuncCallAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   auto sym = builder.symtab().lookup(ident);
   if (!sym) {
-    throw std::runtime_error(fmt::format("Undefined function '{}'", ident));
+    Log::panic(fmt::format("Undefined function '{}'", ident));
   }
 
   std::vector<std::string> arg_val;
@@ -391,12 +381,12 @@ auto AssignStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   std::string val_reg = expr->codeGen(builder);
   auto sym = builder.symtab().lookup(lval->ident);
   if (!sym) {
-    throw std::runtime_error(
+    Log::panic(
         fmt::format("Assignment to undefined variable '{}'", lval->ident));
   }
   //* lval(sym) = val_reg
   if (sym->isConst) {
-    throw std::runtime_error(
+    Log::panic(
         fmt::format("Error: Cannot assign to const variable '{}'", sym->name));
   }
   builder.append(fmt::format("  store {}, {}\n", val_reg, sym->irName));
@@ -497,7 +487,7 @@ auto NumberAST::codeGen([[maybe_unused]] ir::KoopaBuilder &builder) const
 auto LValAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   auto sym = builder.symtab().lookup(ident);
   if (!sym) {
-    throw std::runtime_error(fmt::format("Undefined variable: '{}'", ident));
+    Log::panic(fmt::format("Undefined variable: '{}'", ident));
   }
   //* we can calculate const value in compile time
   if (sym->isConst) {
@@ -518,9 +508,7 @@ auto UnaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   case UnaryOp::Not:
     builder.append(fmt::format("  {} = eq 0, {}\n", ret_reg, rhs_reg));
     break;
-  default:
-    fmt::println(stderr, "Code Gen error: Unknown unary op");
-    std::abort();
+  default: Log::panic("Code Gen error: Unknown unary op");
   }
   return ret_reg;
 }
@@ -620,14 +608,13 @@ auto NumberAST::CalcValue([[maybe_unused]] ir::KoopaBuilder &builder) const
 auto LValAST::CalcValue(ir::KoopaBuilder &builder) const -> int {
   auto sym = builder.symtab().lookup(ident);
   if (!sym) {
-    throw std::runtime_error(
+    Log::panic(
         fmt::format("Undefined variable '{}' in constant expression", ident));
   }
   if (!sym->isConst) {
-    throw std::runtime_error(
-        fmt::format("Variable '{}' is not a constant, cannot be used in "
-                    "constant expression",
-                    ident));
+    Log::panic(fmt::format("Variable '{}' is not a constant, cannot be used in "
+                           "constant expression",
+                           ident));
   }
   return sym->constValue;
 }
@@ -650,13 +637,13 @@ auto BinaryExprAST::CalcValue(ir::KoopaBuilder &builder) const -> int {
   case BinaryOp::Mul: return lhs_val * rhs_val;
   case BinaryOp::Div: {
     if (rhs_val == 0) {
-      throw std::runtime_error("Semantic Error : Division by 0 is undefined");
+      Log::panic("Semantic Error : Division by 0 is undefined");
     }
     return lhs_val / rhs_val;
   }
   case BinaryOp::Mod: {
     if (rhs_val == 0) {
-      throw std::runtime_error("Semantic Error : Remainder by 0 is undefined");
+      Log::panic("Semantic Error : Remainder by 0 is undefined");
     }
     return lhs_val % rhs_val;
   }

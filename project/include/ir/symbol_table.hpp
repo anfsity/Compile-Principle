@@ -1,6 +1,7 @@
 // include/symbol_table.hpp
 #pragma once
 
+#include "Log/log.hpp"
 #include "type.hpp"
 #include <map>
 #include <memory>
@@ -39,34 +40,29 @@ public:
     }
   }
 
-  auto isGlobalScope() const -> bool {
-    return scopes.size() == 1u;
-  }
+  auto isGlobalScope() const -> bool { return scopes.size() == 1u; }
 
-  //FIXME: for debug
-  auto size() const -> size_t {
-    return scopes.size();
-  }
+  // FIXME: for debug
+  auto size() const -> size_t { return scopes.size(); }
 
   auto define(const std::string &name, const std::string &irName,
               std::shared_ptr<type::Type> type, detail::SymbolKind kind,
               bool isConst, int val = 0) -> void {
 
     if (scopes.back().contains(name)) {
-      throw std::runtime_error("Semantic Error: Redefinition of " + name);
+      Log::panic("Semantic Error: Redefinition of " + name);
     }
 
     detail::Symbol sym{name, irName, type, kind, isConst, val};
     scopes.back()[name] = sym;
   }
 
-
   auto defineGlobal(const std::string &name, const std::string &irName,
-              std::shared_ptr<type::Type> type, detail::SymbolKind kind,
-              bool isConst, int val = 0) -> void {
+                    std::shared_ptr<type::Type> type, detail::SymbolKind kind,
+                    bool isConst, int val = 0) -> void {
 
     if (scopes[0].contains(name)) {
-      throw std::runtime_error("Semantic Error: Redefinition of " + name);
+      Log::panic("Semantic Error: Redefinition of " + name);
     }
 
     detail::Symbol sym{name, irName, type, kind, isConst, val};

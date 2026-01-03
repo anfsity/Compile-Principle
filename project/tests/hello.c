@@ -1,10 +1,10 @@
+
+int foo(int a) {
+
+}
+
 int main() {
-  int x = getint();
-  int y = getint();
-  putint(x + y);
-  int c = getch();
-  putch(c);
-  putch(33);
-  putch(10);
-  return 0;
+  int foo;
+  int a = 0;
+  return a;
 }
