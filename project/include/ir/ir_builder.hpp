@@ -96,7 +96,7 @@ public:
     return loopstk.back().continueTarget;
   }
 
-  auto reset() -> void {
+  auto resetCount() -> void {
     count_reg = 0;
     count_name = 0;
     count_label = 0;

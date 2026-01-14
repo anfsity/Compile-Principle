@@ -219,6 +219,7 @@ auto FuncParamAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 }
 
 auto FuncDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
+  builder.resetCount();
   auto btype2irType = [](std::string_view s) -> std::string {
     return (s == "int" ? "i32" : "");
   };
