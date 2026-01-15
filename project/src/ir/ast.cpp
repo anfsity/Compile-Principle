@@ -249,7 +249,7 @@ auto FuncDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   }
 
   builder.enterScope();
-  builder.append("{\n%entry:\n");
+  builder.append(fmt::format("{{\n%entry_{}:\n", ident));
   for (const auto &param : params) {
     param->codeGen(builder);
   }
@@ -287,15 +287,21 @@ auto DeclAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 auto DefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   if (builder.symtab().isGlobalScope()) {
     int val = 0;
+    bool has_init = false;
     if (initVal) {
       val = initVal->CalcValue(builder);
+      has_init = true;
     }
     if (isConst) {
       builder.symtab().defineGlobal(ident, "", type::IntType::get(),
                                     detail::SymbolKind::Var, true, val);
     } else {
       std::string addr = builder.newVar(ident);
-      builder.append(fmt::format("global {} = alloc i32, {}\n", addr, val));
+      if (not has_init) {
+        builder.append(fmt::format("global {} = alloc i32, zeroinit\n", addr));
+      } else {
+        builder.append(fmt::format("global {} = alloc i32, {}\n", addr, val));
+      }
       builder.symtab().defineGlobal(ident, addr, type::IntType::get(),
                                     detail::SymbolKind::Var, false);
     }

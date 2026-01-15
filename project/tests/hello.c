@@ -1,10 +1,6 @@
+int a = 10;
 
-int foo(int a) {
-
-}
-
-int main() {
-  int foo;
-  int a = 0;
+int inc() {
+  a = a + 1;
   return a;
 }
