@@ -25,6 +25,8 @@ public:
 
 class LValAST;
 class DefAST;
+class DeclAST;
+class BlockAST;
 
 //* enum class
 // clang-format off
@@ -41,29 +43,34 @@ enum class UnaryOp { Neg, Not };
 
 class CompUnitAST : public BaseAST {
 public:
-  std::unique_ptr<BaseAST> func_def;
+  std::vector<std::unique_ptr<BaseAST>> children;
+  CompUnitAST(std::vector<std::unique_ptr<BaseAST>> _children)
+      : children(std::move(_children)) {}
+  auto dump(int depth) const -> void override;
+  auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
+};
+
+class FuncParamAST : public BaseAST {
+public:
+  std::string btype;
+  std::string ident;
+  bool isConst;
+  FuncParamAST(std::string _btype, std::string _ident, bool _isConst)
+      : btype(std::move(_btype)), ident(std::move(_ident)), isConst(_isConst) {}
   auto dump(int depth) const -> void override;
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };
 
 class FuncDefAST : public BaseAST {
 public:
-  std::unique_ptr<BaseAST> funcType;
+  ~FuncDefAST() override;
+  std::string btype;
   std::string ident;
-  std::unique_ptr<BaseAST> block;
-  FuncDefAST(BaseAST *_funcType, std::string _ident, BaseAST *_block)
-      : funcType(_funcType), ident(std::move(_ident)), block(_block) {}
-
-  auto dump(int depth) const -> void override;
-  auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
-};
-
-class FuncTypeAST : public BaseAST {
-public:
-  // FIXME: type should use enum class
-  //? or we can just use if else statement ?
-  std::string type;
-  FuncTypeAST(std::string _type) : type(std::move(_type)) {}
+  std::vector<std::unique_ptr<FuncParamAST>> params;
+  std::unique_ptr<BlockAST> block;
+  FuncDefAST(std::string _btype, std::string _ident,
+             std::vector<std::unique_ptr<FuncParamAST>> _params,
+             BaseAST *_block);
   auto dump(int depth) const -> void override;
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };
@@ -75,7 +82,7 @@ public:
   std::string btype;
   std::vector<std::unique_ptr<DefAST>> defs;
   DeclAST(bool _isConst, std::string _btype,
-          std::vector<std::unique_ptr<DefAST>> *_defs);
+          std::vector<std::unique_ptr<DefAST>> _defs);
   auto dump(int depth) const -> void override;
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };
@@ -86,14 +93,21 @@ public:
   std::string ident;
   std::unique_ptr<ExprAST> initVal;
   DefAST(bool _isConst, std::string _ident, BaseAST *_initVal)
-      : isConst(_isConst), ident(_ident) {
+      : isConst(_isConst), ident(std::move(_ident)) {
     if (_initVal) {
       initVal.reset(static_cast<ExprAST *>(_initVal));
     }
-    if (ident == "void") {
-      assert(false && "can't declare void type variable");
-    }
   }
+  auto dump(int depth) const -> void override;
+  auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
+};
+
+class FuncCallAST : public BaseAST {
+public:
+  std::string ident;
+  std::vector<std::unique_ptr<ExprAST>> args;
+  FuncCallAST(std::string _ident, std::vector<std::unique_ptr<ExprAST>> _args)
+      : ident(std::move(_ident)), args(std::move(_args)) {}
   auto dump(int depth) const -> void override;
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };
@@ -104,12 +118,9 @@ class StmtAST : public BaseAST {};
 class BlockAST : public StmtAST {
 public:
   std::vector<std::unique_ptr<BaseAST>> items;
-  BlockAST(std::vector<std::unique_ptr<BaseAST>> *_items) {
-    if (_items) {
-      items = std::move(*_items);
-      delete _items;
-    }
-  }
+  bool createScope = true;
+  BlockAST(std::vector<std::unique_ptr<BaseAST>> _items)
+      : items(std::move(_items)) {}
   auto dump(int depth) const -> void override;
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };

@@ -1,13 +1,16 @@
 // src/ast.cpp
 #include "ir/ast.hpp"
+#include "Log/log.hpp"
 #include "ir/ir_builder.hpp"
 #include <cassert>
 #include <fmt/core.h>
 #include <ranges>
+#include <source_location>
 #include <string>
 #include <vector>
 
 using namespace ast;
+using namespace detail;
 
 auto indent(int d) -> std::string { return std::string(d * 2, ' '); }
 
@@ -35,15 +38,17 @@ auto opToString(BinaryOp op) -> std::string {
 // solve the problem forward declaration
 DeclAST::~DeclAST() = default;
 AssignStmtAST::~AssignStmtAST() = default;
+FuncDefAST::~FuncDefAST() = default;
+
+FuncDefAST::FuncDefAST(std::string _btype, std::string _ident,
+                       std::vector<std::unique_ptr<FuncParamAST>> _params,
+                       BaseAST *_block)
+    : btype(std::move(_btype)), ident(std::move(_ident)),
+      params(std::move(_params)), block(static_cast<BlockAST *>(_block)) {}
 
 DeclAST::DeclAST(bool _isConst, std::string _btype,
-                 std::vector<std::unique_ptr<DefAST>> *_defs)
-    : isConst(_isConst), btype(_btype) {
-  if (_defs) {
-    defs = std::move(*_defs);
-    delete _defs;
-  }
-}
+                 std::vector<std::unique_ptr<DefAST>> _defs)
+    : isConst(_isConst), btype(std::move(_btype)), defs(std::move(_defs)) {}
 
 AssignStmtAST::AssignStmtAST(BaseAST *_lval, BaseAST *_expr) {
   if (_lval) {
@@ -61,23 +66,24 @@ AssignStmtAST::AssignStmtAST(BaseAST *_lval, BaseAST *_expr) {
 
 auto CompUnitAST::dump(int depth) const -> void {
   fmt::println("{}CompUnitAST:", indent(depth));
-  if (func_def) {
-    func_def->dump(depth + 1);
+  for (const auto &child : children) {
+    child->dump(depth + 1);
   }
 }
 
+auto FuncParamAST::dump(int depth) const -> void {
+  fmt::println("{}FuncParamAST: {} {} type: {}", indent(depth), ident,
+               (isConst ? "const" : ""), btype);
+}
+
 auto FuncDefAST::dump(int depth) const -> void {
-  fmt::println("{}FuncDefAST: {}", indent(depth), ident);
-  if (funcType) {
-    funcType->dump(depth + 1);
+  fmt::println("{}FuncDefAST: {} type: {}", indent(depth), ident, btype);
+  for (const auto &param : params) {
+    param->dump(depth + 1);
   }
   if (block) {
     block->dump(depth + 1);
   }
-}
-
-auto FuncTypeAST::dump(int depth) const -> void {
-  fmt::println("{}FuncTypeAST: {}", indent(depth), type);
 }
 
 auto DeclAST::dump(int depth) const -> void {
@@ -92,6 +98,13 @@ auto DefAST::dump(int depth) const -> void {
   fmt::println("{}DefAST: {}", indent(depth), ident);
   if (initVal) {
     initVal->dump(depth + 1);
+  }
+}
+
+auto FuncCallAST::dump(int depth) const -> void {
+  fmt::println("{}FuncCallAST: {}", indent(depth), ident);
+  for (const auto &arg : args) {
+    arg->dump(depth + 1);
   }
 }
 
@@ -179,52 +192,92 @@ auto BinaryExprAST::dump(int depth) const -> void {
  */
 
 auto CompUnitAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
-  if (func_def) {
-    func_def->codeGen(builder);
+  for (const auto &child : children) {
+    child->codeGen(builder);
+    if (&child != &children.back()) {
+      builder.append("\n");
+    }
+  }
+  return "";
+}
+
+auto FuncParamAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
+  if (btype == "void") {
+    Log::panic("Semantic Error: Variable cannot be of type 'void'");
+  }
+  if (isConst) {
+    builder.symtab().define(ident, "", type::IntType::get(), SymbolKind::Var,
+                            true, 0);
+  } else {
+    std::string addr = builder.newReg();
+    builder.append(fmt::format("  {} = alloc i32\n", addr));
+    builder.symtab().define(ident, addr, type::IntType::get(), SymbolKind::Var,
+                            false);
+    builder.append(fmt::format("  store @{}, {}\n", ident, addr));
   }
   return "";
 }
 
 auto FuncDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
-  builder.append("fun @");
+  builder.resetCount();
+  auto btype2irType = [](std::string_view s) -> std::string {
+    return (s == "int" ? "i32" : "");
+  };
+  builder.append(fmt::format("{} @", (block ? "fun" : "decl")));
   builder.append(ident);
-  builder.append("(): ");
-  if (funcType) {
-    funcType->codeGen(builder);
-  }
-  if (block) {
-    builder.append("{\n%entry:\n");
-    builder.clearBlockClose();
-    block->codeGen(builder);
-    // e.g. int main() { int a; }
-    // there is no return value.
-    if (!builder.isBlockClose()) {
-      bool is_void = (funcType && static_cast<FuncTypeAST *>(funcType.get())->type == "void");
-      if (is_void) {
-        builder.append("  ret\n");
-      } else {
-        builder.append("  ret 0\n");
-      }
-      builder.setBlockClose();
+  builder.append("(");
+  for (const auto &param : params) {
+    builder.append(
+        fmt::format("@{}: {}", param->ident, btype2irType(param->btype)));
+    if (&param != &params.back()) {
+      builder.append(", ");
     }
   }
+
+  if (btype == "void") {
+    builder.append(") ");
+    builder.symtab().defineGlobal(ident, "", type::VoidType::get(),
+                                  detail::SymbolKind::Func, false);
+  } else {
+    builder.append(fmt::format("): {} ", btype2irType(btype)));
+    builder.symtab().defineGlobal(ident, "", type::IntType::get(),
+                                  detail::SymbolKind::Func, false);
+  }
+
+  if (!block) {
+    return "";
+  }
+
+  builder.enterScope();
+  builder.append(fmt::format("{{\n%entry_{}:\n", ident));
+  for (const auto &param : params) {
+    param->codeGen(builder);
+  }
+
+  builder.clearBlockClose();
+  block->createScope = false;
+  block->codeGen(builder);
+
+  // e.g. int main() { int a; }
+  // there is no return value.
+  if (!builder.isBlockClose()) {
+    if (btype == "void") {
+      builder.append("  ret\n");
+    } else {
+      builder.append("  ret 0\n");
+    }
+    builder.setBlockClose();
+  }
+
+  builder.exitScope();
   builder.append("}\n");
   return "";
 }
 
-auto FuncTypeAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
-  // FIXME: type should use enum class
-  //? or we can just use if else statement ?
-  std::string return_type;
-  if (type == "int")
-    return_type = "i32 ";
-  else
-    return_type = "void ";
-  builder.append(return_type);
-  return "";
-}
-
 auto DeclAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
+  if (btype == "void") {
+    Log::panic("Semantic Error: Variable cannot be of type 'void'");
+  }
   for (const auto &def : defs) {
     def->codeGen(builder);
   }
@@ -232,35 +285,91 @@ auto DeclAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 }
 
 auto DefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
-  //* const btype var = value
-  if (isConst) {
+  if (builder.symtab().isGlobalScope()) {
     int val = 0;
+    bool has_init = false;
     if (initVal) {
       val = initVal->CalcValue(builder);
+      has_init = true;
     }
-    builder.symtab().define(ident, "", type::IntType::get(), true, val);
+    if (isConst) {
+      builder.symtab().defineGlobal(ident, "", type::IntType::get(),
+                                    detail::SymbolKind::Var, true, val);
+    } else {
+      std::string addr = builder.newVar(ident);
+      if (not has_init) {
+        builder.append(fmt::format("global {} = alloc i32, zeroinit\n", addr));
+      } else {
+        builder.append(fmt::format("global {} = alloc i32, {}\n", addr, val));
+      }
+      builder.symtab().defineGlobal(ident, addr, type::IntType::get(),
+                                    detail::SymbolKind::Var, false);
+    }
   } else {
-    //* btype var = value
-    std::string addr = builder.newVar(ident);
-    builder.append(fmt::format("  {} = alloc i32\n", addr));
-    builder.symtab().define(ident, addr, type::IntType::get(), false);
-    if (initVal) {
-      std::string val_reg = initVal->codeGen(builder);
-      builder.append(fmt::format("  store {}, {}\n", val_reg, addr));
+    //* const btype var = value
+    if (isConst) {
+      int val = 0;
+      if (initVal) {
+        val = initVal->CalcValue(builder);
+      }
+      builder.symtab().define(ident, "", type::IntType::get(), SymbolKind::Var,
+                              true, val);
+    } else {
+      //* btype var = value
+      std::string addr = builder.newVar(ident);
+      builder.append(fmt::format("  {} = alloc i32\n", addr));
+      builder.symtab().define(ident, addr, type::IntType::get(),
+                              SymbolKind::Var, false);
+      if (initVal) {
+        std::string val_reg = initVal->codeGen(builder);
+        builder.append(fmt::format("  store {}, {}\n", val_reg, addr));
+      }
     }
   }
   return "";
 }
 
+auto FuncCallAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
+  auto sym = builder.symtab().lookup(ident);
+  if (!sym) {
+    Log::panic(fmt::format("Undefined function '{}'", ident));
+  }
+
+  std::vector<std::string> arg_val;
+  for (const auto &arg : args) {
+    arg_val.emplace_back(arg->codeGen(builder));
+  }
+  std::string ret_reg;
+  if (sym->type->is_void()) {
+    builder.append(fmt::format("  call @{}(", ident));
+  } else {
+    ret_reg = builder.newReg();
+    builder.append(fmt::format("  {} = call @{}(", ret_reg, ident));
+  }
+  for (const auto &val : arg_val) {
+    builder.append(val);
+    if (&val != &arg_val.back()) {
+      builder.append(", ");
+    }
+  }
+  builder.append(")\n");
+  // builder.append(fmt::format("//! [Debug]: args size: {}\n", args.size()));
+  return ret_reg;
+}
+
 auto BlockAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
-  builder.enterScope();
+  if (this->createScope) {
+    builder.enterScope();
+  }
   for (const auto &item : items) {
     if (builder.isBlockClose()) {
       continue;
     }
     item->codeGen(builder);
   }
-  builder.exitScope();
+  if (this->createScope) {
+    builder.exitScope();
+  }
   return "";
 }
 
@@ -278,12 +387,14 @@ auto ReturnStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 auto AssignStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   std::string val_reg = expr->codeGen(builder);
   auto sym = builder.symtab().lookup(lval->ident);
-  assert(sym && "Assignment to undefined variable");
+  if (!sym) {
+    Log::panic(
+        fmt::format("Assignment to undefined variable '{}'", lval->ident));
+  }
   //* lval(sym) = val_reg
   if (sym->isConst) {
-    fmt::println(stderr, "Error: Cannot assign to const variable '{}'",
-                 sym->name);
-    std::abort();
+    Log::panic(
+        fmt::format("Error: Cannot assign to const variable '{}'", sym->name));
   }
   builder.append(fmt::format("  store {}, {}\n", val_reg, sym->irName));
   return "";
@@ -382,7 +493,9 @@ auto NumberAST::codeGen([[maybe_unused]] ir::KoopaBuilder &builder) const
 
 auto LValAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   auto sym = builder.symtab().lookup(ident);
-  assert(sym && "Undefined variable");
+  if (!sym) {
+    Log::panic(fmt::format("Undefined variable: '{}'", ident));
+  }
   //* we can calculate const value in compile time
   if (sym->isConst) {
     return std::to_string(sym->constValue);
@@ -402,9 +515,7 @@ auto UnaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   case UnaryOp::Not:
     builder.append(fmt::format("  {} = eq 0, {}\n", ret_reg, rhs_reg));
     break;
-  default:
-    fmt::println(stderr, "Code Gen error: Unknown unary op");
-    std::abort();
+  default: Log::panic("Code Gen error: Unknown unary op");
   }
   return ret_reg;
 }
@@ -503,11 +614,16 @@ auto NumberAST::CalcValue([[maybe_unused]] ir::KoopaBuilder &builder) const
 
 auto LValAST::CalcValue(ir::KoopaBuilder &builder) const -> int {
   auto sym = builder.symtab().lookup(ident);
-  assert(sym && "Undefined variable in constant expression");
-  if (sym->isConst) {
-    return sym->constValue;
+  if (!sym) {
+    Log::panic(
+        fmt::format("Undefined variable '{}' in constant expression", ident));
   }
-  return 0;
+  if (!sym->isConst) {
+    Log::panic(fmt::format("Variable '{}' is not a constant, cannot be used in "
+                           "constant expression",
+                           ident));
+  }
+  return sym->constValue;
 }
 
 auto UnaryExprAST::CalcValue(ir::KoopaBuilder &builder) const -> int {
@@ -528,13 +644,13 @@ auto BinaryExprAST::CalcValue(ir::KoopaBuilder &builder) const -> int {
   case BinaryOp::Mul: return lhs_val * rhs_val;
   case BinaryOp::Div: {
     if (rhs_val == 0) {
-      throw std::runtime_error("Semantic Error : Division by 0 is undefined");
+      Log::panic("Semantic Error : Division by 0 is undefined");
     }
     return lhs_val / rhs_val;
   }
   case BinaryOp::Mod: {
     if (rhs_val == 0) {
-      throw std::runtime_error("Semantic Error : Remainder by 0 is undefined");
+      Log::panic("Semantic Error : Remainder by 0 is undefined");
     }
     return lhs_val % rhs_val;
   }

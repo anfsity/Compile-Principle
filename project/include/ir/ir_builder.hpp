@@ -1,6 +1,7 @@
 // include/ir_builder.hpp
 #pragma once
 
+#include "Log/log.hpp"
 #include "symbol_table.hpp"
 #include <fmt/core.h>
 #include <string>
@@ -23,6 +24,37 @@ private:
   SymbolTable _symtab;
 
 public:
+  KoopaBuilder() {
+    // register library funtions
+    [&]() -> void {
+      buffer.append("decl @getint(): i32\n");
+      buffer.append("decl @getch(): i32\n");
+      buffer.append("decl @getarray(*i32): i32\n");
+      buffer.append("decl @putint(i32)\n");
+      buffer.append("decl @putch(i32)\n");
+      buffer.append("decl @putarray(i32, *i32)\n");
+      buffer.append("decl @starttime()\n");
+      buffer.append("decl @stoptime()\n\n");
+
+      _symtab.defineGlobal("getint", "", type::IntType::get(),
+                           detail::SymbolKind::Func, false);
+      _symtab.defineGlobal("getch", "", type::IntType::get(),
+                           detail::SymbolKind::Func, false);
+      _symtab.defineGlobal("getarray", "", type::IntType::get(),
+                           detail::SymbolKind::Func, false);
+      _symtab.defineGlobal("putint", "", type::VoidType::get(),
+                           detail::SymbolKind::Func, false);
+      _symtab.defineGlobal("putch", "", type::VoidType::get(),
+                           detail::SymbolKind::Func, false);
+      _symtab.defineGlobal("putarray", "", type::VoidType::get(),
+                           detail::SymbolKind::Func, false);
+      _symtab.defineGlobal("starttime", "", type::VoidType::get(),
+                           detail::SymbolKind::Func, false);
+      _symtab.defineGlobal("stoptime", "", type::VoidType::get(),
+                           detail::SymbolKind::Func, false);
+    }();
+  }
+
   auto append(std::string_view str) -> void { buffer += str; }
   // registers allocate
   auto newReg() -> std::string { return fmt::format("%{}", count_reg++); }
@@ -52,21 +84,19 @@ public:
 
   auto getBreakTarget() -> std::string_view {
     if (loopstk.empty()) {
-      fmt::println(stderr, "Semantic Error: 'break' statement not within loop.");
-      std::abort();
+      Log::panic("Semantic Error: 'break' statement not within loop.");
     }
     return loopstk.back().breakTarget;
   }
 
   auto getContinueTarget() -> std::string_view {
     if (loopstk.empty()) {
-      fmt::println(stderr, "Semantic Error: 'continue' statement not within loop.");
-      std::abort();
+      Log::panic("Semantic Error: 'continue' statement not within loop.");
     }
     return loopstk.back().continueTarget;
   }
 
-  auto reset() -> void {
+  auto resetCount() -> void {
     count_reg = 0;
     count_name = 0;
     count_label = 0;
