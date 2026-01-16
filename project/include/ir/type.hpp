@@ -1,4 +1,7 @@
-// include/type.hpp
+/**
+ * @file type.hpp
+ * @brief Type system for the compiler's intermediate representation.
+ */
 #pragma once
 
 #include <fmt/core.h>
@@ -7,10 +10,19 @@
 #include <vector>
 
 namespace type {
+
+/**
+ * @brief Base class for all types in the IR.
+ */
 class Type {
 public:
   virtual ~Type() = default;
+
+  /**
+   * @brief Returns a string representation of the type.
+   */
   virtual auto debug() const -> std::string = 0;
+
   virtual auto is_int() const -> bool { return false; }
   virtual auto is_void() const -> bool { return false; }
   virtual auto is_ptr() const -> bool { return false; }
@@ -18,50 +30,87 @@ public:
   virtual auto is_float() const -> bool { return false; }
 };
 
+/**
+ * @brief Represents a standard 32-bit integer type.
+ */
 class IntType : public Type {
 public:
-  auto debug() const -> std::string override { return "int"; }
+  auto debug() const -> std::string override { return "i32"; }
   auto is_int() const -> bool override { return true; }
+
+  /**
+   * @brief Singleton getter for the IntType.
+   */
   static auto get() -> std::shared_ptr<IntType> {
     static auto instance = std::make_shared<IntType>();
     return instance;
   }
 };
 
+/**
+ * @brief Represents the void type (no return value).
+ */
 class VoidType : public Type {
 public:
   auto debug() const -> std::string override { return "void"; }
   auto is_void() const -> bool override { return true; }
+
+  /**
+   * @brief Singleton getter for the VoidType.
+   */
   static auto get() -> std::shared_ptr<VoidType> {
     static auto instance = std::make_shared<VoidType>();
     return instance;
   }
 };
 
+/**
+ * @brief Represents a boolean type.
+ */
 class BoolType : public Type {
 public:
   auto debug() const -> std::string override { return "bool"; }
   auto is_bool() const -> bool override { return true; }
+
+  /**
+   * @brief Singleton getter for the BoolType.
+   */
   static auto get() -> std::shared_ptr<BoolType> {
     static auto instance = std::make_shared<BoolType>();
     return instance;
   }
 };
 
+/**
+ * @brief Represents a floating-point type.
+ */
 class FloatType : public Type {
 public:
   auto debug() const -> std::string override { return "float"; }
   auto is_float() const -> bool override { return true; }
+
+  /**
+   * @brief Singleton getter for the FloatType.
+   */
   static auto get() -> std::shared_ptr<FloatType> {
     static auto instance = std::make_shared<FloatType>();
     return instance;
   }
 };
 
+/**
+ * @brief Represents a pointer type to another type.
+ */
 class PtrType : public Type {
 public:
-  std::shared_ptr<Type> target;
+  std::shared_ptr<Type> target; ///< The type being pointed to.
+
+  /**
+   * @brief Constructs a pointer type.
+   * @param t The base type.
+   */
   PtrType(std::shared_ptr<Type> t) : target(t) {};
+
   auto debug() const -> std::string override {
     return fmt::format("*{}", target->debug());
   }

@@ -73,7 +73,8 @@ class CompUnitAST : public BaseAST {
 public:
   std::vector<std::unique_ptr<BaseAST>> children;
   /**
-   * @brief Constructs a compilation unit from a list of children (decls/funcdefs).
+   * @brief Constructs a compilation unit from a list of children
+   * (decls/funcdefs).
    * @param _children List of top-level constructs.
    */
   CompUnitAST(std::vector<std::unique_ptr<BaseAST>> _children)
