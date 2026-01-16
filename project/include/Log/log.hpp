@@ -1,4 +1,8 @@
 // include/Log/log.hpp
+/**
+ * @file log.hpp
+ * @brief Logging and error handling utilities for the compiler.
+ */
 #pragma once
 
 #include <fmt/color.h>
@@ -8,6 +12,13 @@
 
 namespace detail {
 
+/**
+ * @brief Formats a message with source location information.
+ * @param loc The source location.
+ * @param fmt_str Format string.
+ * @param args Format arguments.
+ * @return Formatted string including location info.
+ */
 template <typename... Args>
 static auto format_msg(const std::source_location &loc,
                        std::string_view fmt_str, Args &&...args)
@@ -19,6 +30,9 @@ static auto format_msg(const std::source_location &loc,
                      loc.line(), loc.function_name());
 }
 
+/**
+ * @brief Custom exception for compilation errors.
+ */
 class CompileError : public std::runtime_error {
 public:
   explicit CompileError(const std::string &message)
@@ -27,8 +41,18 @@ public:
 
 } // namespace detail
 
+/**
+ * @brief Static logging utility.
+ */
 class Log {
 public:
+  /**
+   * @brief Reports a fatal error, prints debug info, and throws a CompileError.
+   * 
+   * @param fmt_str Format string for the error message.
+   * @param args Arguments for the format string.
+   * @param loc Source location (defaults to caller site).
+   */
   template <typename... Args>
   static auto
   panic(std::string_view fmt_str, Args &&...args,
@@ -46,6 +70,13 @@ public:
         detail::format_msg(loc, fmt_str, std::forward<Args>(args)...));
   }
 
+  /**
+   * @brief Prints a trace message for debugging.
+   * 
+   * @param fmt_str Format string for the trace message.
+   * @param args Arguments for the format string.
+   * @param loc Source location (defaults to caller site).
+   */
   template <typename... Args>
   static auto
   trace(std::string_view fmt_str, Args &&...args,
