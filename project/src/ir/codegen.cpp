@@ -57,7 +57,8 @@ auto CompUnitAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
  * @brief Generates IR for function parameters.
  *
  * Checks for validity (no 'void' variables) and defines the parameter in the
- * current symbol table. If it's not a constant, it allocates space on the stack.
+ * current symbol table. If it's not a constant, it allocates space on the
+ * stack.
  *
  * @param builder The IR builder context.
  * @return An empty string.
@@ -123,7 +124,8 @@ auto FuncDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     return "";
   }
 
-  // enterScope mechanism: creates a new symbol table level for local variables and parameters.
+  // enterScope mechanism: creates a new symbol table level for local variables
+  // and parameters.
   builder.enterScope();
   builder.append(fmt::format("{{\n%entry_{}:\n", ident));
   for (const auto &param : params) {
@@ -145,8 +147,9 @@ auto FuncDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     builder.setBlockClose();
   }
 
-  // exitScope mechanism: pops the current symbol table level. All variables defined within this
-  // function (including params) are removed from the lookup table, preventing access from outside.
+  // exitScope mechanism: pops the current symbol table level. All variables
+  // defined within this function (including params) are removed from the lookup
+  // table, preventing access from outside.
   builder.exitScope();
   builder.append("}\n");
   return "";
@@ -155,7 +158,8 @@ auto FuncDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 /**
  * @brief Generates IR for variable/constant declarations.
  *
- * Checks for invalid 'void' types and generates IR for each variable definition.
+ * Checks for invalid 'void' types and generates IR for each variable
+ * definition.
  *
  * @param builder The IR builder context.
  * @return An empty string.
@@ -176,7 +180,8 @@ auto DeclAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
  * Handles both global and local variables:
  * - Globals: Allocated in the global space, possibly with an initializer.
  * - Locals: Allocated on the stack using 'alloc'. Constants are tracked in the
- *   symbol table but don't result in 'alloc' instructions unless they are non-const.
+ *   symbol table but don't result in 'alloc' instructions unless they are
+ * non-const.
  *
  * @param builder The IR builder context.
  * @return An empty string.
@@ -265,8 +270,9 @@ auto FuncCallAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 /**
  * @brief Generates IR for a block of statements (enclosed in { }).
  *
- * Handles creation and destruction of local scopes. Using `enterScope` and `exitScope`
- * ensures that variables defined within this block are not visible outside.
+ * Handles creation and destruction of local scopes. Using `enterScope` and
+ * `exitScope` ensures that variables defined within this block are not visible
+ * outside.
  *
  * @param builder The IR builder context.
  * @return An empty string.
@@ -353,7 +359,8 @@ auto ExprStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
  * @brief Generates IR for an if statement, including optional else.
  *
  * Uses basic blocks and 'br' (branching) instructions to implement the logic.
- * Handles label allocation and basic block termination with 'jump' instructions.
+ * Handles label allocation and basic block termination with 'jump'
+ * instructions.
  *
  * @param builder The IR builder context.
  * @return An empty string.
@@ -361,9 +368,11 @@ auto ExprStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 auto IfStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   std::string cond_reg = cond->codeGen(builder);
   int id = builder.allocLabelId();
+  // clang-format off
   std::string then_label = builder.newLabel("then", id);
   std::string else_label = builder.newLabel("else", id);
-  std::string end_label = builder.newLabel("end", id);
+  std::string end_label  = builder.newLabel("end",  id);
+  // clang-format on
   if (elseS) {
     builder.append(
         fmt::format("  br {}, {}, {}\n", cond_reg, then_label, else_label));
