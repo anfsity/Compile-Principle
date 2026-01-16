@@ -1,41 +1,15 @@
-/* src/sysy.lx */
-/*  https://pku-minic.github.io/online-doc/#/lv1-main/lexer-parser */
+/*
+ * @file sysy.lx
+ * @brief Lexical analyzer for the SysY language.
+ *
+ * This Flex file defines the tokens for the SysY language, including
+ * keywords, identifiers, numeric literals (decimal, octal, hex),
+ * and various operators. It also handles white space and comments.
+ * https://pku-minic.github.io/online-doc/#/lv1-main/lexer-parser
+ */
 %option noyywrap
 %option nounput
 %option noinput
-
-/*
-CompUnit  ::= FuncDef;
-
-FuncDef   ::= FuncType IDENT "(" ")" Block;
-FuncType  ::= "int";
-
-Block         ::= "{" {BlockItem} "}";
-BlockItem     ::= Decl | Stmt;
-
-Decl          ::= ConstDecl;
-ConstDecl     ::= "const" BType ConstDef {"," ConstDef} ";";
-BType         ::= "int";
-ConstDef      ::= IDENT "=" ConstInitVal;
-ConstInitVal  ::= ConstExp;
-
-Stmt        ::= "return" Exp ";";
-
-Exp         ::= AddExp;
-LVal          ::= IDENT;
-
-PrimaryExp    ::= "(" Exp ")" | LVal | Number;
-ConstExp      ::= Exp;
-Number      ::= INT_CONST;
-UnaryExp    ::= PrimaryExp | UnaryOp UnaryExp;
-UnaryOp     ::= "+" | "-" | "!";
-MulExp      ::= UnaryExp | MulExp ("*" | "/" | "%") UnaryExp;
-AddExp      ::= MulExp | AddExp ("+" | "-") MulExp;
-RelExp      ::= AddExp | RelExp ("<" | ">" | "<=" | ">=") AddExp;
-EqExp       ::= RelExp | EqExp ("==" | "!=") RelExp;
-LAndExp     ::= EqExp | LAndExp "&&" EqExp;
-LOrExp      ::= LAndExp | LOrExp "||" LAndExp;
- */
 
 %{
 #include <string>
@@ -43,28 +17,31 @@ LOrExp      ::= LAndExp | LOrExp "||" LAndExp;
 #include "sysy.tab.hpp"
 %}
 
-/* White space and comment */
+/* White space and single-line comment */
 WhiteSpace [ \t\n\r]*
 LineComment "//".*
+
+/* Multi-line comment state */
 %x MultiLineComment
-/* identifier */
+
+/* Identifier: starts with a letter or underscore, followed by alphanumeric characters */
 Identifier [a-zA-Z_][a-zA-Z0-9_]*
 
-/* integer literal */
+/* Integer literals in different bases */
 Decimal [1-9][0-9]*
 Octal 0[0-7]*
 Hexadecimal 0[xX][0-9a-fA-F]+
 
 %%
-{WhiteSpace}        {}
-{LineComment}       {}
+{WhiteSpace}        { /* Skip whitespace */ }
+{LineComment}       { /* Skip single-line comments */ }
 
 "/*"                { BEGIN(MultiLineComment); }
 <MultiLineComment>{
-    "*/"            { BEGIN(INITIAL); } /* return to initialize state */
-    [^*\n]+         { /* ignore chars that not * and not newline */ }
-    "*"             { /* ignore single * */ }
-    \n              { /* ignore newline */ }
+    "*/"            { BEGIN(INITIAL); } /* Return to initial state */
+    [^*\n]+         { /* Skip characters */ }
+    "*"             { /* Skip individual stars */ }
+    \n              { /* Skip newlines */ }
 }
 
 "int"               { return INT; }
