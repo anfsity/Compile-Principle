@@ -14,6 +14,7 @@ message(STATUS "[INFO]  Generated parser outpus ${BISON_Parser_OUTPUT_SOURCE}")
 
 set(CORE_SOURCES
     ir/ast.cpp
+    ir/codegen.cpp
     backend/backend.cpp
     ${FLEX_Lexer_OUTPUTS}
     ${BISON_Parser_OUTPUT_SOURCE}

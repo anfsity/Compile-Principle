@@ -1,3 +1,7 @@
+/**
+ * @file sysy.y
+ * @brief Bison parser for the SysY language.
+ */
 // src/sysy.y
 %code requires {
   #include <memory>
@@ -16,14 +20,22 @@
 
 using namespace ast;
 int yylex();
+/**
+ * @brief Error reporting function for Bison.
+ */
 void yyerror(std::unique_ptr<BaseAST> &ast, const char *str);
 
 // code in this will be inserted into sysy.lex.cpp
 %}
 
-// actually, yyparser don't have any paramters by default, you need to reload it.
+/**
+ * @brief Parameter passed to yyparse.
+ */
 %parse-param { std::unique_ptr<ast::BaseAST> &ast }
 
+/**
+ * @brief Semantic value types.
+ */
 %union {
   std::string *str_val;
   int int_val;
@@ -34,22 +46,6 @@ void yyerror(std::unique_ptr<BaseAST> &ast, const char *str);
   std::vector<std::unique_ptr<ast::FuncParamAST>> *funcParams_val;
   std::vector<std::unique_ptr<ast::ExprAST>> *args_val;
 }
-
-/*
-Decl          ::= ConstDecl;
-ConstDecl     ::= "const" BType ConstDef {"," ConstDef} ";";
-BType         ::= "int";
-ConstDef      ::= IDENT "=" ConstInitVal;
-ConstInitVal  ::= ConstExp;
-
-Block         ::= "{" {BlockItem} "}";
-BlockItem     ::= Decl | Stmt;
-
-LVal          ::= IDENT;
-PrimaryExp    ::= "(" Exp ")" | LVal | Number;
-
-ConstExp      ::= Exp;
- */
 
 // terminal letters are written in uppercase.
 %token VOID INT RETURN OR AND EQ NE LE GE PRIORITY 
@@ -76,9 +72,12 @@ ConstExp      ::= Exp;
 %left '<' '>' LE GE       // < > <= >=
 %left '+' '-'             // + -
 %left '*' '/' '%'         // * / %
-%right '!' PRIORITY          // ! -
+%right '!' PRIORITY       // ! -
 
 %%
+/**
+ * @brief Top-level unit of a program.
+ */
 CompUnit 
   : CompUnitItemList {
     auto comp_unit = new CompUnitAST(std::move(*$1));
@@ -86,6 +85,9 @@ CompUnit
     delete $1;
   };
 
+/**
+ * @brief List of compilation unit items (global declarations or function definitions).
+ */
 CompUnitItemList
   : CompUnitItem {
     // unique_ptr automatic takeover of ownership of $1
@@ -105,6 +107,9 @@ CompUnitItem
     $$ = $1;
   };
 
+/**
+ * @brief Function definition.
+ */
 FuncDef
   : Btype IDENT '(' ')' Block {
     auto params = std::vector<std::unique_ptr<FuncParamAST>>();
@@ -119,6 +124,9 @@ FuncDef
     delete $4;
   };
 
+/**
+ * @brief Function formal parameters.
+ */
 FuncFParams 
   : FuncFParam {
     $$ = new std::vector<std::unique_ptr<FuncParamAST>>();
@@ -142,6 +150,9 @@ FuncFParam
   }
 
 
+/**
+ * @brief A block of code enclosed in curly braces.
+ */
 Block
   : '{' BlockItemList '}' {
     $$ = new BlockAST(std::move(*$2));
@@ -221,6 +232,9 @@ Btype
   : INT { $$ = new std::string("int"); }
   | VOID { $$ = new std::string("void"); };
 
+/**
+ * @brief Statements (assignment, block, expression, if, while, break, continue, return).
+ */
 Stmt
   : LVal '=' Expr ';' {
     $$ = new AssignStmtAST($1, $3);
@@ -256,6 +270,9 @@ Stmt
     $$ = new IfStmtAST($3, $5, $7);
   };
 
+/**
+ * @brief Expressions (number, unary, binary, function calls, nested expressions).
+ */
 Expr
   : Number { $$ = $1; }
   | '(' Expr ')' { $$ = $2; }
@@ -333,6 +350,9 @@ LVal
     delete $1;
   };
 
+/**
+ * @brief Function real parameters (arguments).
+ */
 FuncRParams 
   : Expr {
     $$ = new std::vector<std::unique_ptr<ExprAST>>();
