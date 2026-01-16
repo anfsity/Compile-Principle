@@ -1,4 +1,26 @@
-// src/codegen.cpp
+/**
+ * @file codegen.cpp
+ * @brief Implementation of IR code generation for various AST nodes.
+ *
+ * This file contains the codeGen methods for all AST nodes, translating the
+ * high-level syntax into Koopa IR. It utilizes a ir::KoopaBuilder to manage
+ * the IR generation process, including register allocation, label management,
+ * and scope control.
+ *
+ * ### Scoping Mechanism (`enterScope` and `exitScope`)
+ *
+ * Scoping is managed through the `symbol_table` within the `KoopaBuilder`.
+ *
+ * - `enterScope()`: When entering a function or a block, a new level is added
+ *   to the symbol table stack. Any new variable or constant defined within
+ *   this level will shadow definitions in outer levels.
+ *
+ * - `exitScope()`: When leaving a function or block, the current level is
+ *   discarded. This effectively makes any local variables defined in that
+ *   block inaccessible to outer blocks, maintaining the lexical scoping
+ *   rules of the language. This mechanism is critical for correctly
+ *   implementing nested blocks and function-local visibility.
+ */
 #include "Log/log.hpp"
 #include "ir/ast.hpp"
 #include "ir/ir_builder.hpp"
@@ -13,10 +35,14 @@ using namespace ast;
 using namespace detail;
 
 /**
- ** @brief codegen implementation
+ * @brief Generates IR for a compilation unit (the top-level node).
  *
+ * Iterates through all children (declarations and function definitions)
+ * and generates IR for each.
+ *
+ * @param builder The IR builder context.
+ * @return An empty string (top-level nodes don't return values).
  */
-
 auto CompUnitAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   for (const auto &child : children) {
     child->codeGen(builder);
@@ -27,6 +53,15 @@ auto CompUnitAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   return "";
 }
 
+/**
+ * @brief Generates IR for function parameters.
+ *
+ * Checks for validity (no 'void' variables) and defines the parameter in the
+ * current symbol table. If it's not a constant, it allocates space on the stack.
+ *
+ * @param builder The IR builder context.
+ * @return An empty string.
+ */
 auto FuncParamAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   if (btype == "void") {
     Log::panic("Semantic Error: Variable cannot be of type 'void'");
@@ -44,6 +79,20 @@ auto FuncParamAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   return "";
 }
 
+/**
+ * @brief Generates IR for a function definition.
+ *
+ * This involves:
+ * 1. Defining the function globally.
+ * 2. Creating an entry basic block.
+ * 3. Entering a new scope for the function body and parameters.
+ * 4. Generating IR for parameters and the function body (block).
+ * 5. Handling implicit return if the block doesn't terminate.
+ * 6. Exiting the scope to clear the function's local symbols.
+ *
+ * @param builder The IR builder context.
+ * @return An empty string.
+ */
 auto FuncDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   builder.resetCount();
   auto btype2irType = [](std::string_view s) -> std::string {
@@ -74,6 +123,7 @@ auto FuncDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     return "";
   }
 
+  // enterScope mechanism: creates a new symbol table level for local variables and parameters.
   builder.enterScope();
   builder.append(fmt::format("{{\n%entry_{}:\n", ident));
   for (const auto &param : params) {
@@ -95,11 +145,21 @@ auto FuncDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     builder.setBlockClose();
   }
 
+  // exitScope mechanism: pops the current symbol table level. All variables defined within this
+  // function (including params) are removed from the lookup table, preventing access from outside.
   builder.exitScope();
   builder.append("}\n");
   return "";
 }
 
+/**
+ * @brief Generates IR for variable/constant declarations.
+ *
+ * Checks for invalid 'void' types and generates IR for each variable definition.
+ *
+ * @param builder The IR builder context.
+ * @return An empty string.
+ */
 auto DeclAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   if (btype == "void") {
     Log::panic("Semantic Error: Variable cannot be of type 'void'");
@@ -110,6 +170,17 @@ auto DeclAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   return "";
 }
 
+/**
+ * @brief Generates IR for a single variable definition (Def).
+ *
+ * Handles both global and local variables:
+ * - Globals: Allocated in the global space, possibly with an initializer.
+ * - Locals: Allocated on the stack using 'alloc'. Constants are tracked in the
+ *   symbol table but don't result in 'alloc' instructions unless they are non-const.
+ *
+ * @param builder The IR builder context.
+ * @return An empty string.
+ */
 auto DefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   if (builder.symtab().isGlobalScope()) {
     int val = 0;
@@ -132,7 +203,7 @@ auto DefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
                                     detail::SymbolKind::Var, false);
     }
   } else {
-    //* const btype var = value
+    // const btype var = value
     if (isConst) {
       int val = 0;
       if (initVal) {
@@ -141,7 +212,7 @@ auto DefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
       builder.symtab().define(ident, "", type::IntType::get(), SymbolKind::Var,
                               true, val);
     } else {
-      //* btype var = value
+      // btype var = value
       std::string addr = builder.newVar(ident);
       builder.append(fmt::format("  {} = alloc i32\n", addr));
       builder.symtab().define(ident, addr, type::IntType::get(),
@@ -155,6 +226,15 @@ auto DefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   return "";
 }
 
+/**
+ * @brief Generates IR for a function call.
+ *
+ * Lookups the function in the symbol table, generates IR for arguments,
+ * and appends a 'call' instruction.
+ *
+ * @param builder The IR builder context.
+ * @return The register name holding the return value (if any).
+ */
 auto FuncCallAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   auto sym = builder.symtab().lookup(ident);
   if (!sym) {
@@ -179,10 +259,18 @@ auto FuncCallAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     }
   }
   builder.append(")\n");
-  // builder.append(fmt::format("//! [Debug]: args size: {}\n", args.size()));
   return ret_reg;
 }
 
+/**
+ * @brief Generates IR for a block of statements (enclosed in { }).
+ *
+ * Handles creation and destruction of local scopes. Using `enterScope` and `exitScope`
+ * ensures that variables defined within this block are not visible outside.
+ *
+ * @param builder The IR builder context.
+ * @return An empty string.
+ */
 auto BlockAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   if (this->createScope) {
     builder.enterScope();
@@ -194,12 +282,23 @@ auto BlockAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     item->codeGen(builder);
   }
   if (this->createScope) {
+    // exitScope mechanism: Pushes the current scope level off the stack.
+    // This maintains the "stack-based" scoping where inner scopes can see
+    // outer scopes but not vice-versa.
     builder.exitScope();
   }
   return "";
 }
 
-//* return expr
+/**
+ * @brief Generates IR for a return statement.
+ *
+ * Evaluates the return expression (if present) and appends a 'ret' instruction.
+ * Marks the current basic block as closed.
+ *
+ * @param builder The IR builder context.
+ * @return An empty string.
+ */
 auto ReturnStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   std::string ret_val;
   if (expr) {
@@ -210,6 +309,15 @@ auto ReturnStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   return "";
 }
 
+/**
+ * @brief Generates IR for an assignment statement.
+ *
+ * Evaluates the right-hand side expression and stores the result into the
+ * memory address associated with the left-hand side variable.
+ *
+ * @param builder The IR builder context.
+ * @return An empty string.
+ */
 auto AssignStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   std::string val_reg = expr->codeGen(builder);
   auto sym = builder.symtab().lookup(lval->ident);
@@ -226,6 +334,14 @@ auto AssignStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   return "";
 }
 
+/**
+ * @brief Generates IR for an expression statement.
+ *
+ * Simply evaluates the expression. The result is discarded.
+ *
+ * @param builder The IR builder context.
+ * @return An empty string.
+ */
 auto ExprStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   if (expr) {
     expr->codeGen(builder);
@@ -233,6 +349,15 @@ auto ExprStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   return "";
 }
 
+/**
+ * @brief Generates IR for an if statement, including optional else.
+ *
+ * Uses basic blocks and 'br' (branching) instructions to implement the logic.
+ * Handles label allocation and basic block termination with 'jump' instructions.
+ *
+ * @param builder The IR builder context.
+ * @return An empty string.
+ */
 auto IfStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   std::string cond_reg = cond->codeGen(builder);
   int id = builder.allocLabelId();
@@ -270,6 +395,15 @@ auto IfStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   return "";
 }
 
+/**
+ * @brief Generates IR for a while loop statement.
+ *
+ * Implements the loop logic using entry, body, and end basic blocks.
+ * Manages the loop stack in the builder to support 'break' and 'continue'.
+ *
+ * @param builder The IR builder context.
+ * @return An empty string.
+ */
 auto WhileStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   int id = builder.allocLabelId();
   std::string entry_label = builder.newLabel("while_entry", id);
@@ -298,6 +432,14 @@ auto WhileStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   return "";
 }
 
+/**
+ * @brief Generates IR for a break statement.
+ *
+ * Jumps to the end label of the current innermost loop.
+ *
+ * @param builder The IR builder context.
+ * @return An empty string.
+ */
 auto BreakStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   auto target = builder.getBreakTarget();
   builder.append(fmt::format("  jump {}\n", target));
@@ -305,6 +447,14 @@ auto BreakStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   return "";
 }
 
+/**
+ * @brief Generates IR for a continue statement.
+ *
+ * Jumps to the entry (condition check) label of the current innermost loop.
+ *
+ * @param builder The IR builder context.
+ * @return An empty string.
+ */
 auto ContinueStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   auto target = builder.getContinueTarget();
   builder.append(fmt::format("  jump {}\n", target));
@@ -312,11 +462,28 @@ auto ContinueStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   return "";
 }
 
+/**
+ * @brief Generates IR for a literal number.
+ *
+ * Returns the string representation of the integer value.
+ *
+ * @param builder The IR builder context.
+ * @return The string value of the number.
+ */
 auto NumberAST::codeGen([[maybe_unused]] ir::KoopaBuilder &builder) const
     -> std::string {
   return std::to_string(val);
 }
 
+/**
+ * @brief Generates IR for an L-value (variable access).
+ *
+ * Loads the variable's value from its memory address into a new register.
+ * If the variable is a constant, its value is returned directly.
+ *
+ * @param builder The IR builder context.
+ * @return The register name or constant value.
+ */
 auto LValAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   auto sym = builder.symtab().lookup(ident);
   if (!sym) {
@@ -331,6 +498,14 @@ auto LValAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   return reg;
 }
 
+/**
+ * @brief Generates IR for unary expressions.
+ *
+ * Performs operations like negation (sub 0, rhs) and logical NOT (eq 0, rhs).
+ *
+ * @param builder The IR builder context.
+ * @return The register name holding the result.
+ */
 auto UnaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   std::string rhs_reg = rhs->codeGen(builder);
   std::string ret_reg = builder.newReg();
@@ -341,11 +516,20 @@ auto UnaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   case UnaryOp::Not:
     builder.append(fmt::format("  {} = eq 0, {}\n", ret_reg, rhs_reg));
     break;
-  default: Log::panic("Code Gen error: Unknown unary op");
+  default: Log::panic("Code Gen Error: Unknown unary op");
   }
   return ret_reg;
 }
 
+/**
+ * @brief Generates IR for binary expressions.
+ *
+ * Includes special handling for short-circuiting logical operations (AND, OR)
+ * using branching and temporary memory storage.
+ *
+ * @param builder The IR builder context.
+ * @return The register name holding the result.
+ */
 auto BinaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   if (op == BinaryOp::And) {
     std::string tmp_addr = builder.newVar("and_res");
@@ -429,15 +613,23 @@ auto BinaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 }
 
 /**
- ** @brief calculate constexpr value
- *
+ * @brief Evaluates a literal number at compile time.
+ * @param builder The IR builder context.
+ * @return The integer value of the number.
  */
-
 auto NumberAST::CalcValue([[maybe_unused]] ir::KoopaBuilder &builder) const
     -> int {
   return val;
 }
 
+/**
+ * @brief Evaluates an L-value at compile time.
+ *
+ * Only permitted for constant variables.
+ *
+ * @param builder The IR builder context.
+ * @return The constant value of the variable.
+ */
 auto LValAST::CalcValue(ir::KoopaBuilder &builder) const -> int {
   auto sym = builder.symtab().lookup(ident);
   if (!sym) {
@@ -452,6 +644,11 @@ auto LValAST::CalcValue(ir::KoopaBuilder &builder) const -> int {
   return sym->constValue;
 }
 
+/**
+ * @brief Evaluates a unary expression at compile time.
+ * @param builder The IR builder context.
+ * @return The result of the unary operation.
+ */
 auto UnaryExprAST::CalcValue(ir::KoopaBuilder &builder) const -> int {
   int rhs_val = rhs->CalcValue(builder);
   switch (op) {
@@ -461,6 +658,14 @@ auto UnaryExprAST::CalcValue(ir::KoopaBuilder &builder) const -> int {
   }
 }
 
+/**
+ * @brief Evaluates a binary expression at compile time.
+ *
+ * Performs calculations for all supported binary operators.
+ *
+ * @param builder The IR builder context.
+ * @return The result of the binary operation.
+ */
 auto BinaryExprAST::CalcValue(ir::KoopaBuilder &builder) const -> int {
   int rhs_val = rhs->CalcValue(builder);
   int lhs_val = lhs->CalcValue(builder);
