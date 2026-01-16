@@ -262,3 +262,30 @@ public:
 //* expr AST end
 
 }; // namespace ast
+
+namespace detail {
+
+auto inline indent(int d) -> std::string { return std::string(d * 2, ' '); }
+
+auto inline opToString(ast::BinaryOp op) -> std::string {
+  // clang-format off
+  switch (op) {
+  case ast::BinaryOp::Add: return "add";
+  case ast::BinaryOp::Sub: return "sub";
+  case ast::BinaryOp::Mul: return "mul";
+  case ast::BinaryOp::Div: return "div";
+  case ast::BinaryOp::Mod: return "mod";
+  case ast::BinaryOp::Lt:  return "lt";
+  case ast::BinaryOp::Gt:  return "gt";
+  case ast::BinaryOp::Le:  return "le";
+  case ast::BinaryOp::Ge:  return "ge";
+  case ast::BinaryOp::Eq:  return "eq";
+  case ast::BinaryOp::Ne:  return "ne";
+  case ast::BinaryOp::And: return "and";
+  case ast::BinaryOp::Or:  return "or";
+  default: return "?";
+  }
+  // clang-format on
+}
+
+} // namespace detail
