@@ -1,6 +1,16 @@
-// src/main.cpp
-#include "ir/ast.hpp"
+/**
+ * @file main.cpp
+ * @brief Entry point for the SysY compiler.
+ * 
+ * The compiler pipeline consists of:
+ * 1. Lexing & Parsing (Flex/Bison) -> AST
+ * 2. IR Generation (AST::codeGen) -> Koopa IR
+ * 3. Backend (TargetCodeGen::visit) -> RISC-V Assembly
+ */
+
 #include "backend/backend.hpp"
+#include "backend/koopawrapper.hpp"
+#include "ir/ast.hpp"
 #include "ir/ir_builder.hpp"
 #include <cassert>
 #include <cstdio>
@@ -20,6 +30,7 @@ auto main(int argc, const char *argv[]) -> int {
   auto inputFile = *(argv + 2);
   auto outputFile = *(argv + 4);
 
+  // 1. Initialize Lexer and Parse SysY source into AST
   yyin = fopen(inputFile, "r");
   assert(yyin && "invaild input");
 
@@ -27,10 +38,11 @@ auto main(int argc, const char *argv[]) -> int {
   auto ret = yyparse(ast);
   assert(!ret && "parsing failed");
 
-  // generate abstract semantic tree
+  // Debug: Dump AST
   fmt::println("parsing successed! there is a AST:");
   ast->dump(0);
 
+  // 2. Generate Koopa IR from AST
   ir::KoopaBuilder irBuilder;
   ast->codeGen(irBuilder);
 
@@ -41,6 +53,7 @@ auto main(int argc, const char *argv[]) -> int {
     output_bool = true;
   }
 
+  // 3. Generate RISC-V assembly from Koopa IR
   backend::KoopaWrapper wrapper(ir);
   backend::TargetCodeGen generator;
   generator.visit(wrapper.getRaw());

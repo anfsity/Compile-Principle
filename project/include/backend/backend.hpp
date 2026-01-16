@@ -1,4 +1,7 @@
-// include/backend.hpp
+/**
+ * @file backend.hpp
+ * @brief Definition of the RISC-V Target Code Generator.
+ */
 #pragma once
 
 #include "ir/ir_builder.hpp"
@@ -7,73 +10,27 @@
 #include <map>
 
 namespace backend {
-class KoopaWrapper {
-private:
-  koopa_raw_program_t raw;
-  koopa_program_t program;
-  koopa_raw_program_builder_t builder;
 
-public:
-  KoopaWrapper(const std::string &IR) {
-    koopa_error_code_t ret = koopa_parse_from_string(IR.c_str(), &program);
-    assert(ret == KOOPA_EC_SUCCESS && "parsing koopa ir failure");
-    builder = koopa_new_raw_program_builder();
-    raw = koopa_build_raw_program(builder, program);
-  };
-
-  ~KoopaWrapper() noexcept {
-    if (program)
-      koopa_delete_program(program);
-    if (builder)
-      koopa_delete_raw_program_builder(builder);
-  };
-
-  // copy consturctor must be deleted, otherwise the copy behavior will cause
-  // raw break.
-  KoopaWrapper(const KoopaWrapper &) = delete;
-  KoopaWrapper &operator=(const KoopaWrapper &) = delete;
-
-  // move constructor ?
-  KoopaWrapper(KoopaWrapper &&other) noexcept {
-    raw = other.raw;
-    program = other.program;
-    builder = other.builder;
-    // memory in other will be deconstruted, to avoid hang pointer, we need to
-    // clear other's varibles.
-    other.program = nullptr;
-    other.builder = nullptr;
-  }
-
-  KoopaWrapper &operator=(KoopaWrapper &&other) {
-    if (&other != this) {
-      if (program)
-        koopa_delete_program(program);
-      if (builder)
-        koopa_delete_raw_program_builder(builder);
-
-      raw = other.raw;
-      program = other.program;
-      builder = other.builder;
-      other.program = nullptr;
-      other.builder = nullptr;
-    }
-    return *this;
-  }
-
-  const koopa_raw_program_t &getRaw() const { return raw; }
-};
-
+/**
+ * @brief Generates RISC-V assembly from Koopa IR.
+ */
 class TargetCodeGen {
 private:
-  std::string buffer;
-  int stk_frame_size = 0;
-  int local_frame_size = 0;
-  int ra_size = 0;
-  int args_size = 0;
+  // clang-format off
+  std::string buffer;       ///< Accumulates the generated assembly code.
+  int stk_frame_size = 0;   ///< Total size of the current function's stack frame.
+  int local_frame_size = 0; ///< Size of local variable storage area.
+  int ra_size = 0;          ///< Space reserved for the Return Address (4 bytes) if needed.
+  int args_size = 0;        ///< Space reserved for outgoing arguments on the stack.
+  // clang-format on
+
   // the offset of value relative to sp
   std::map<const koopa_raw_value_t, int> stkMap;
 
 public:
+  /**
+   * @brief Entry point for code generation from a Koopa program.
+   */
   auto visit(const koopa_raw_program_t &program) -> void;
 
   /**
@@ -91,8 +48,15 @@ public:
   [[nodiscard]] auto getAssembly() -> std::string { return std::move(buffer); }
 
 private:
+  /**
+   * @brief Generates code to load a value into a specific RISC-V register.
+   */
   auto load_to(const koopa_raw_value_t &value, const std::string &reg) -> void;
 
+  /**
+   * @brief Resets the state of the generator, typically called before
+   * processing a new function.
+   */
   auto reset() -> void {
     stkMap.clear();
     stk_frame_size = ra_size = args_size = local_frame_size = 0;
@@ -107,24 +71,19 @@ private:
   // access raw insts
   auto visit(koopa_raw_value_t value) -> void;
 
+  /** @name Specific Instruction Visitors
+   *  @{
+   */
   auto visit(const koopa_raw_return_t &ret) -> void;
-
   auto visit(const koopa_raw_binary_t &binary) -> void;
-
   auto visit(const koopa_raw_integer_t &integer) -> void;
-
   auto visit(const koopa_raw_jump_t &jump) -> void;
-
   auto visit(const koopa_raw_branch_t &branch) -> void;
-
   auto visit(const koopa_raw_load_t &load) -> void;
-
   auto visit(const koopa_raw_store_t &store) -> void;
-
   auto visit(const koopa_raw_call_t &call) -> void;
-
   auto visit(const koopa_raw_func_arg_ref_t &func_arg_ref) -> void;
-
   auto visit(const koopa_raw_global_alloc_t &global_alloc) -> void;
+  /** @} */
 };
 } // namespace backend
