@@ -98,13 +98,19 @@
  * - `stk_frame_size`: Total size of the current stack frame, aligned to 16
  * bytes (RISC-V calling convention).
  */
-#include "backend/backend.hpp"
-#include "Log/log.hpp"
-#include "ir/ir_builder.hpp"
+
+module;
+
 #include "koopa.h"
 #include <cassert>
 #include <fmt/core.h>
 #include <span>
+#include <string>
+
+module backend;
+
+import ir_builder;
+import log;
 
 namespace backend {
 /**

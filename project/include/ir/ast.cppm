@@ -1,20 +1,25 @@
 /**
- * @file ast.hpp
+ * @file ast.cppm
  * @brief Abstract Syntax Tree (AST) definitions for the compiler.
  */
-#pragma once
 
-#include "ir_builder.hpp"
-#include "symbol_table.hpp"
+module;
+
 #include <cassert>
 #include <fmt/core.h>
 #include <memory>
 #include <string>
+#include <vector>
+
+export module ir.ast;
+
+import symbol_table;
+import ir_builder;
 
 /**
  * @brief Namespace containing all AST related classes and functions.
  */
-namespace ast {
+export namespace ast {
 
 /**
  * @brief Base class for all AST nodes.
@@ -428,7 +433,7 @@ public:
 /**
  * @brief Helper functions for AST operations.
  */
-namespace detail {
+export namespace detail {
 
 /**
  * @brief Helper function to generate indentation strings.

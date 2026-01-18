@@ -8,11 +8,12 @@
  * 3. Backend (TargetCodeGen::visit) -> RISC-V Assembly
  */
 
-#include "Log/log.hpp"
-#include "backend/backend.hpp"
-#include "backend/koopawrapper.hpp"
-#include "ir/ast.hpp"
-#include "ir/ir_builder.hpp"
+import log;
+import ir_builder;
+import ir.ast;
+import koopawrapper;
+import backend;
+
 #include <cassert>
 #include <cstdio>
 #include <fmt/color.h>

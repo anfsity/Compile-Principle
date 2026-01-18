@@ -8,7 +8,7 @@ PWD := $(shell pwd)
 all: build
 
 config:
-	cmake -S . -B $(BUILD_DIR)
+	cmake -S . -B cmake-build -G Ninja -DCMAKE_MAKE_PROGRAM=$(PWD)/ninja
 
 build: config
 	cmake --build $(BUILD_DIR) -j12
@@ -21,6 +21,7 @@ shell:
 			-u $(UID):$(GID) \
 			-v "$(PWD):$(PWD)" \
 			-w "$(PWD)" \
+			-e PATH="$(PWD):/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
 			$(IMAGE) bash
 
 run:
