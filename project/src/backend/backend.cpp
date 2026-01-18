@@ -184,10 +184,6 @@ auto TargetCodeGen::visit(koopa_raw_function_t func) -> void {
   args_size = std::max<int>(args_size - 8, 0) * 4;
   stk_frame_size = local_frame_size + ra_size + args_size;
 
-  // Log calculation results for debugging.
-  Log::trace(fmt::format("stack frame size : {}", stk_frame_size));
-  Log::trace(fmt::format("params frame size : {}", args_size));
-
   // Align stack frame to 16 bytes as per RISC-V ABI.
   if (stk_frame_size % 16 != 0) {
     stk_frame_size = (stk_frame_size + 15) / 16 * 16;
@@ -252,25 +248,43 @@ auto TargetCodeGen::visit(koopa_raw_basic_block_t bb) -> void {
 auto TargetCodeGen::visit(koopa_raw_value_t value) -> void {
   const auto &kind = value->kind;
   switch (kind.tag) {
-    // clang-format off
-  case KOOPA_RVT_RETURN:  visit(kind.data.ret);         break;
-  case KOOPA_RVT_INTEGER: visit(kind.data.integer);     break;
-  case KOOPA_RVT_STORE:   visit(kind.data.store);       break;
-  case KOOPA_RVT_ALLOC:   /* Stack space already reserved in function pre-pass */ break;
-  // clang-format on
+
+  case KOOPA_RVT_RETURN: {
+    visit(kind.data.ret);
+    break;
+  }
+
+  case KOOPA_RVT_INTEGER: {
+    visit(kind.data.integer);
+    break;
+  }
+
+  case KOOPA_RVT_STORE: {
+    visit(kind.data.store);
+    break;
+  }
+
+  case KOOPA_RVT_ALLOC: {
+    /* Stack space already reserved in function pre-pass */
+    break;
+  }
+
   case KOOPA_RVT_BRANCH: {
     visit(kind.data.branch);
     break;
   }
+
   case KOOPA_RVT_JUMP: {
     visit(kind.data.jump);
     break;
   }
+
   case KOOPA_RVT_FUNC_ARG_REF: {
     // Reference to a function argument.
     visit(kind.data.func_arg_ref);
     break;
   }
+
   case KOOPA_RVT_CALL: {
     visit(kind.data.call);
     // If the function returns an int, it's in a0. Save it to the stack slot
@@ -281,6 +295,7 @@ auto TargetCodeGen::visit(koopa_raw_value_t value) -> void {
     }
     break;
   }
+
   case KOOPA_RVT_GLOBAL_ALLOC: {
     // Global variable allocation in the .data section.
     buffer += "  .data\n";
@@ -289,6 +304,7 @@ auto TargetCodeGen::visit(koopa_raw_value_t value) -> void {
     visit(kind.data.global_alloc);
     break;
   }
+
   case KOOPA_RVT_BINARY: {
     visit(kind.data.binary);
     // Binary operations result in a value in t0. Save it to stack.
@@ -298,6 +314,7 @@ auto TargetCodeGen::visit(koopa_raw_value_t value) -> void {
     }
     break;
   }
+
   case KOOPA_RVT_LOAD: {
     visit(kind.data.load);
     // Load result is in t0. Save it to stack.
@@ -307,6 +324,7 @@ auto TargetCodeGen::visit(koopa_raw_value_t value) -> void {
     }
     break;
   }
+
   default: assert(false);
   }
 }
@@ -378,18 +396,21 @@ auto TargetCodeGen::visit(const koopa_raw_return_t &ret) -> void {
 auto TargetCodeGen::load_to(const koopa_raw_value_t &value,
                             const std::string &reg) -> void {
   switch (value->kind.tag) {
+
   case KOOPA_RVT_INTEGER: {
     // Constant integer.
     int32_t val = value->kind.data.integer.value;
     buffer += fmt::format("  li {}, {}\n", reg, val);
     break;
   }
+
   case KOOPA_RVT_GLOBAL_ALLOC: {
     // Global variable address.
     std::string var_name = value->name + 1;
     buffer += fmt::format("  la {}, {}\n", reg, var_name);
     break;
   }
+
   // Local allocations and instruction results are all stored in the stack
   // frame.
   case KOOPA_RVT_CALL:
@@ -401,6 +422,7 @@ auto TargetCodeGen::load_to(const koopa_raw_value_t &value,
     buffer += fmt::format("  lw {}, {}(sp)\n", reg, offset);
     break;
   }
+
   default: {
     buffer += "Wait! Do you realy think you arguments should go here ?\n";
     break;

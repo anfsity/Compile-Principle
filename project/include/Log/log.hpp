@@ -1,4 +1,3 @@
-// include/Log/log.hpp
 /**
  * @file log.hpp
  * @brief Logging and error handling utilities for the compiler.

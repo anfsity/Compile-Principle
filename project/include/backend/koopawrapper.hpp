@@ -1,4 +1,3 @@
-
 /**
  * @file koopawrapper.hpp
  * @brief RAII wrapper for Koopa IR parsing and raw program building.
