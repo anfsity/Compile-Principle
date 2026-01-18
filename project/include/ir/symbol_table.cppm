@@ -1,15 +1,14 @@
 /**
- * @file symbol_table.hpp
+ * @file symbol_table.cppm
  * @brief Definition of the SymbolTable class for scope-based symbol management.
  *
  * This file provides the infrastructure for lexical scoping and symbol tracking
  * during the AST-to-IR generation phase. It supports nested scopes, constant
  * tracking, and IR name mapping.
  */
-#pragma once
 
-#include "Log/log.hpp"
-#include "type.hpp"
+module;
+
 #include <map>
 #include <memory>
 #include <optional>
@@ -18,11 +17,15 @@
 #include <string>
 #include <vector>
 
-namespace detail {
+export module symbol_table;
+
+import ir.type;
+import log;
+
 /**
  * @brief Categorizes the type of symbol.
  */
-enum class SymbolKind { Var, Func };
+export enum class SymbolKind { Var, Func };
 
 /**
  * @brief Represents a single symbol in the source code.
@@ -35,7 +38,6 @@ struct Symbol {
   bool isConst;                     ///< True if it's a compile-time constant
   int constValue; ///< The value of the constant, if applicable
 };
-} // namespace detail
 
 /**
  * @brief A stack-based symbol table for handling lexical scopes.
@@ -43,13 +45,13 @@ struct Symbol {
  * Manages symbol visibility across nested blocks and provides IR name
  * resolution. The 0-th index always represents the global scope.
  */
-class SymbolTable {
+export class SymbolTable {
 private:
   //* scopes[0] indicates global scope
   /**
    * @brief A stack of maps, where each map represents a lexical scope.
    */
-  std::vector<std::map<std::string, detail::Symbol>> scopes;
+  std::vector<std::map<std::string, Symbol>> scopes;
 
 public:
   /**
@@ -94,14 +96,14 @@ public:
    * @param val     Initial value if constant.
    */
   auto define(const std::string &name, const std::string &irName,
-              std::shared_ptr<type::Type> type, detail::SymbolKind kind,
+              std::shared_ptr<type::Type> type, SymbolKind kind,
               bool isConst, int val = 0) -> void {
 
     if (scopes.back().contains(name)) {
       Log::panic("Semantic Error: Redefinition of " + name);
     }
 
-    detail::Symbol sym{name, irName, type, kind, isConst, val};
+    Symbol sym{name, irName, type, kind, isConst, val};
     scopes.back()[name] = sym;
   }
 
@@ -109,14 +111,14 @@ public:
    * @brief Defines a new symbol specifically in the global scope.
    */
   auto defineGlobal(const std::string &name, const std::string &irName,
-                    std::shared_ptr<type::Type> type, detail::SymbolKind kind,
+                    std::shared_ptr<type::Type> type, SymbolKind kind,
                     bool isConst, int val = 0) -> void {
 
     if (scopes[0].contains(name)) {
       Log::panic("Semantic Error: Redefinition of " + name);
     }
 
-    detail::Symbol sym{name, irName, type, kind, isConst, val};
+    Symbol sym{name, irName, type, kind, isConst, val};
     scopes[0][name] = sym;
   }
 
@@ -124,9 +126,9 @@ public:
    * @brief Searches for a symbol starting from the innermost scope outwards.
    *
    * @param name The source name to look up.
-   * @return detail::Symbol* Pointer to the symbol if found, else nullptr.
+   * @return Symbol* Pointer to the symbol if found, else nullptr.
    */
-  auto lookup(const std::string &name) -> detail::Symbol * {
+  auto lookup(const std::string &name) -> Symbol * {
     for (auto &scope : std::views::reverse(scopes)) {
       auto it = scope.find(name);
       if (it != scope.end()) {

@@ -1,15 +1,18 @@
 /**
- * @file type.hpp
+ * @file type.cppm
  * @brief Type system for the compiler's intermediate representation.
  */
-#pragma once
+
+module;
 
 #include <fmt/core.h>
 #include <memory>
 #include <string>
 #include <vector>
 
-namespace type {
+export module ir.type;
+
+export namespace type {
 
 /**
  * @brief Base class for all types in the IR.

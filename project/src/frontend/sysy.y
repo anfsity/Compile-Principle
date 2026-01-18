@@ -4,19 +4,25 @@
  */
 // src/sysy.y
 %code requires {
-  #include <memory>
-  #include <string>
-  #include "ir/ast.hpp"
+
+#include <memory>
+#include <string>
+#include <vector>
+
+import ir.ast;
+
 // code in this will be inserted into sysy.lex.hpp
 }
 
 %{
+  
 #include <memory>
 #include <string>
 #include <vector>
 #include <fmt/core.h>
-#include "ir/ast.hpp"
-#include "Log/log.hpp"
+
+import log;
+import ir.ast;
 
 using namespace ast;
 int yylex();

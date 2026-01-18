@@ -1,18 +1,22 @@
 /**
- * @file koopawrapper.hpp
+ * @file koopawrapper.cppm
  * @brief RAII wrapper for Koopa IR parsing and raw program building.
  *
  * This file provides a C++ wrapper around the Koopa C API to ensure 
  * proper resource management (RAII) for Koopa programs and builders.
  */
-#pragma once
 
-#include "ir/ir_builder.hpp"
+module;
+
 #include "koopa.h"
 #include <cassert>
-#include <map>
+#include <string>
 
-namespace backend {
+export module koopawrapper;
+
+import ir_builder;
+
+export namespace backend {
 
 /**
  * @brief Manages the lifecycle of Koopa IR objects.

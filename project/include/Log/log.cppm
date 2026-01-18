@@ -1,13 +1,16 @@
 /**
- * @file log.hpp
+ * @file log.cppm
  * @brief Logging and error handling utilities for the compiler.
  */
-#pragma once
+
+module;
 
 #include <fmt/color.h>
 #include <fmt/core.h>
 #include <source_location>
 #include <string>
+
+export module log;
 
 namespace detail {
 
@@ -19,7 +22,7 @@ namespace detail {
  * @return Formatted string including location info.
  */
 template <typename... Args>
-static auto format_msg(const std::source_location &loc,
+auto format_msg(const std::source_location &loc,
                        std::string_view fmt_str, Args &&...args)
     -> std::string {
   std::string user_msg =
@@ -43,7 +46,7 @@ public:
 /**
  * @brief Static logging utility.
  */
-class Log {
+export class Log {
 public:
   /**
    * @brief Reports a fatal error, prints debug info, and throws a CompileError.

@@ -21,15 +21,21 @@
  *   rules of the language. This mechanism is critical for correctly
  *   implementing nested blocks and function-local visibility.
  */
-#include "Log/log.hpp"
-#include "ir/ast.hpp"
-#include "ir/ir_builder.hpp"
+
+module;
+
 #include <cassert>
 #include <fmt/core.h>
 #include <ranges>
 #include <source_location>
 #include <string>
 #include <vector>
+
+module ir.ast;
+
+import ir_builder;
+import ir.type;
+import log;
 
 using namespace ast;
 using namespace detail;
@@ -113,11 +119,11 @@ auto FuncDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   if (btype == "void") {
     builder.append(") ");
     builder.symtab().defineGlobal(ident, "", type::VoidType::get(),
-                                  detail::SymbolKind::Func, false);
+                                  SymbolKind::Func, false);
   } else {
     builder.append(fmt::format("): {} ", btype2irType(btype)));
     builder.symtab().defineGlobal(ident, "", type::IntType::get(),
-                                  detail::SymbolKind::Func, false);
+                                  SymbolKind::Func, false);
   }
 
   if (!block) {
@@ -196,7 +202,7 @@ auto DefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     }
     if (isConst) {
       builder.symtab().defineGlobal(ident, "", type::IntType::get(),
-                                    detail::SymbolKind::Var, true, val);
+                                    SymbolKind::Var, true, val);
     } else {
       std::string addr = builder.newVar(ident);
       if (not has_init) {
@@ -205,7 +211,7 @@ auto DefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
         builder.append(fmt::format("global {} = alloc i32, {}\n", addr, val));
       }
       builder.symtab().defineGlobal(ident, addr, type::IntType::get(),
-                                    detail::SymbolKind::Var, false);
+                                    SymbolKind::Var, false);
     }
   } else {
     // const btype var = value

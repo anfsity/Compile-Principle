@@ -8,7 +8,7 @@ PWD := $(shell pwd)
 all: build
 
 config:
-	cmake -S . -B $(BUILD_DIR)
+	cmake -S . -B $(BUILD_DIR) -G Ninja -DCMAKE_MAKE_PROGRAM=$(PWD)/ninja
 
 build: config
 	cmake --build $(BUILD_DIR) -j12

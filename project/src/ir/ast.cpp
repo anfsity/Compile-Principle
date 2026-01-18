@@ -2,15 +2,21 @@
  * @file ast.cpp
  * @brief Implementation of Abstract Syntax Tree (AST) node methods.
  */
-#include "ir/ast.hpp"
-#include "Log/log.hpp"
-#include "ir/ir_builder.hpp"
+
+module;
+
 #include <cassert>
 #include <fmt/core.h>
+#include <memory>
 #include <ranges>
 #include <source_location>
 #include <string>
 #include <vector>
+
+module ir.ast;
+
+import ir_builder;
+import log;
 
 using namespace ast;
 using namespace detail;

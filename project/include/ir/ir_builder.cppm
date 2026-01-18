@@ -1,18 +1,24 @@
 /**
- * @file ir_builder.hpp
+ * @file ir_builder.cppm
  * @brief Definition of the KoopaBuilder class for IR generation.
  *
  * This file providing the infrastructure for building Koopa IR text.
  * It manages symbol tables, register numbering, and label generation.
  */
-#pragma once
 
-#include "Log/log.hpp"
-#include "symbol_table.hpp"
+module;
+
 #include <fmt/core.h>
 #include <string>
+#include <vector>
 
-namespace ir {
+export module ir_builder;
+
+import ir.type;
+import log;
+import symbol_table;
+
+export namespace ir {
 
 /**
  * @brief Context for loop control flow (break/continue).
@@ -54,22 +60,22 @@ public:
       buffer.append("decl @starttime()\n");
       buffer.append("decl @stoptime()\n\n");
 
-      _symtab.defineGlobal("getint", "", type::IntType::get(),
-                           detail::SymbolKind::Func, false);
-      _symtab.defineGlobal("getch", "", type::IntType::get(),
-                           detail::SymbolKind::Func, false);
+      _symtab.defineGlobal("getint", "", type::IntType::get(), SymbolKind::Func,
+                           false);
+      _symtab.defineGlobal("getch", "", type::IntType::get(), SymbolKind::Func,
+                           false);
       _symtab.defineGlobal("getarray", "", type::IntType::get(),
-                           detail::SymbolKind::Func, false);
+                           SymbolKind::Func, false);
       _symtab.defineGlobal("putint", "", type::VoidType::get(),
-                           detail::SymbolKind::Func, false);
-      _symtab.defineGlobal("putch", "", type::VoidType::get(),
-                           detail::SymbolKind::Func, false);
+                           SymbolKind::Func, false);
+      _symtab.defineGlobal("putch", "", type::VoidType::get(), SymbolKind::Func,
+                           false);
       _symtab.defineGlobal("putarray", "", type::VoidType::get(),
-                           detail::SymbolKind::Func, false);
+                           SymbolKind::Func, false);
       _symtab.defineGlobal("starttime", "", type::VoidType::get(),
-                           detail::SymbolKind::Func, false);
+                           SymbolKind::Func, false);
       _symtab.defineGlobal("stoptime", "", type::VoidType::get(),
-                           detail::SymbolKind::Func, false);
+                           SymbolKind::Func, false);
     }();
   }
 

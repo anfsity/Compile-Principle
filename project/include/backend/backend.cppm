@@ -1,15 +1,20 @@
 /**
- * @file backend.hpp
+ * @file backend.cppm
  * @brief Definition of the RISC-V Target Code Generator.
  */
-#pragma once
 
-#include "ir/ir_builder.hpp"
+module;
+
 #include "koopa.h"
 #include <cassert>
 #include <map>
+#include <string>
 
-namespace backend {
+export module backend;
+
+import ir_builder;
+
+export namespace backend {
 
 /**
  * @brief Generates RISC-V assembly from Koopa IR.

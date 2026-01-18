@@ -26,6 +26,19 @@ target_include_directories(compiler_core PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}  # cmake-build/src/* for generated lexer/parser
 )
 
+target_sources(compiler_core PUBLIC
+    FILE_SET CXX_MODULES
+    BASE_DIRS ${PROJECT_SOURCE_DIR}/include
+    FILES
+    ${PROJECT_SOURCE_DIR}/include/backend/koopawrapper.cppm
+    ${PROJECT_SOURCE_DIR}/include/backend/backend.cppm
+    ${PROJECT_SOURCE_DIR}/include/ir/ast.cppm
+    ${PROJECT_SOURCE_DIR}/include/ir/type.cppm
+    ${PROJECT_SOURCE_DIR}/include/ir/symbol_table.cppm
+    ${PROJECT_SOURCE_DIR}/include/ir/ir_builder.cppm
+    ${PROJECT_SOURCE_DIR}/include/Log/log.cppm
+)
+
 # compiler core link libraries
 target_link_libraries(compiler_core PUBLIC
     koopa
