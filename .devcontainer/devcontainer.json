@@ -1,0 +1,58 @@
+{
+  "name": "SysY Compiler Dev",
+  "image": "maxxing/compiler-dev",
+
+  "workspaceMount": "source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind",
+  "workspaceFolder": "${localWorkspaceFolder}",
+
+  "mounts": [
+    "source=${localEnv:HOME}/.ssh,target=/home/ubuntu/.ssh,type=bind,consistency=cached"
+  ],
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "llvm-vs-code-extensions.vscode-clangd",
+        "ms-vscode.cmake-tools",
+        "twxs.cmake",
+        "daohong-emilio.yash",
+        "mikawi.flex-language"
+      ],
+      "settings": {
+        "clangd.path": "/usr/bin/clangd-21",
+        "clangd.arguments": [
+          "--compile-commands-dir=${containerWorkspaceFolder}/cmake-build",
+          "--background-index",
+          "--j=12",
+          "--completion-style=detailed",
+          "--header-insertion=never",
+          "--clang-tidy",
+          "--background-index",
+          "--inlay-hints=true",
+          "--fallback-style=LLVM"
+        ],
+        "cmake.buildDirectory": "${workspaceFolder}/cmake-build"
+      }
+    }
+  },
+
+  "remoteUser": "ubuntu",
+
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "username": "ubuntu",
+      "userUid": "automatic",
+      "userGid": "automatic",
+      "configureZshAsDefaultShell": true
+    }
+  },
+
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y clangd-21",
+
+  "runArgs": [
+    "--network=host",
+    "--cap-add=SYS_PTRACE",
+    "--security-opt",
+    "seccomp=unconfined"
+  ]
+}
