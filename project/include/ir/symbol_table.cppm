@@ -11,9 +11,7 @@ module;
 
 #include <map>
 #include <memory>
-#include <optional>
 #include <ranges>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -35,7 +33,7 @@ struct Symbol {
   std::string irName;               ///< IR-level name (e.g., "@x_1")
   std::shared_ptr<type::Type> type; ///< Data type of the symbol
   SymbolKind kind;                  ///< Variable or Function
-  bool isConst;                     ///< True if it's a compile-time constant
+  bool is_const;                     ///< True if it's a compile-time constant
   int constValue; ///< The value of the constant, if applicable
 };
 
@@ -92,18 +90,18 @@ public:
    * @param irName  Generated IR name.
    * @param type    The type of the symbol.
    * @param kind    Var or Func.
-   * @param isConst Whether it's constant.
+   * @param is_const Whether it's constant.
    * @param val     Initial value if constant.
    */
   auto define(const std::string &name, const std::string &irName,
               std::shared_ptr<type::Type> type, SymbolKind kind,
-              bool isConst, int val = 0) -> void {
+              bool is_const, int val = 0) -> void {
 
     if (scopes.back().contains(name)) {
       Log::panic("Semantic Error: Redefinition of " + name);
     }
 
-    Symbol sym{name, irName, type, kind, isConst, val};
+    Symbol sym{name, irName, type, kind, is_const, val};
     scopes.back()[name] = sym;
   }
 
@@ -112,13 +110,13 @@ public:
    */
   auto defineGlobal(const std::string &name, const std::string &irName,
                     std::shared_ptr<type::Type> type, SymbolKind kind,
-                    bool isConst, int val = 0) -> void {
+                    bool is_const, int val = 0) -> void {
 
     if (scopes[0].contains(name)) {
       Log::panic("Semantic Error: Redefinition of " + name);
     }
 
-    Symbol sym{name, irName, type, kind, isConst, val};
+    Symbol sym{name, irName, type, kind, is_const, val};
     scopes[0][name] = sym;
   }
 

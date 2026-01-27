@@ -23,6 +23,9 @@ export namespace ast {
 
 /**
  * @brief Base class for all AST nodes.
+ ** Represents the "entities that make up the program".
+ ** It encompasses everything, but here, it primarily serves as a global
+ ** structure for things that are neither expressions nor simple statements.
  */
 class BaseAST {
 public:
@@ -35,13 +38,14 @@ public:
   /**
    * @brief Generates IR code for the AST node.
    * @param builder The IR builder to use.
-   * @return The IR representation of the node (usually a value name).
+   * @return The IR representation of the node (usually a empty string).
    */
   virtual auto codeGen(ir::KoopaBuilder &builder) const -> std::string = 0;
 };
 
 /**
  * @brief Base class for expression AST nodes that can be evaluated.
+ ** This represents "calculations that yield results".
  */
 class ExprAST : public BaseAST {
 public:
@@ -54,8 +58,6 @@ public:
 };
 
 class LValAST;
-class DefAST;
-class DeclAST;
 class BlockAST;
 
 //* enum class
@@ -95,15 +97,16 @@ class FuncParamAST : public BaseAST {
 public:
   std::string btype;
   std::string ident;
-  bool isConst;
+  bool is_const;
   /**
    * @brief Constructs a function parameter.
    * @param _btype The type of the parameter (e.g., "int").
    * @param _ident The name of the parameter.
-   * @param _isConst Whether the parameter is constant.
+   * @param _is_const Whether the parameter is constant.
    */
-  FuncParamAST(std::string _btype, std::string _ident, bool _isConst)
-      : btype(std::move(_btype)), ident(std::move(_ident)), isConst(_isConst) {}
+  FuncParamAST(std::string _btype, std::string _ident, bool _is_const)
+      : btype(std::move(_btype)), ident(std::move(_ident)),
+        is_const(_is_const) {}
   auto dump(int depth) const -> void override;
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };
@@ -133,42 +136,21 @@ public:
 };
 
 /**
- * @brief AST node for declarations (e.g., int a, b = 1;).
- */
-class DeclAST : public BaseAST {
-public:
-  ~DeclAST() override;
-  bool isConst;
-  std::string btype;
-  std::vector<std::unique_ptr<DefAST>> defs;
-  /**
-   * @brief Constructs a declaration node.
-   * @param _isConst Whether the variables are constant.
-   * @param _btype The type of the variables.
-   * @param _defs The list of variable definitions.
-   */
-  DeclAST(bool _isConst, std::string _btype,
-          std::vector<std::unique_ptr<DefAST>> _defs);
-  auto dump(int depth) const -> void override;
-  auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
-};
-
-/**
  * @brief AST node for a single variable definition.
  */
 class DefAST : public BaseAST {
 public:
-  bool isConst;
+  bool is_const;
   std::string ident;
   std::unique_ptr<ExprAST> initVal;
   /**
    * @brief Constructs a variable definition.
-   * @param _isConst Whether the variable is constant.
+   * @param _is_const Whether the variable is constant.
    * @param _ident The name of the variable.
    * @param _initVal The initial value expression (optional).
    */
-  DefAST(bool _isConst, std::string _ident, BaseAST *_initVal)
-      : isConst(_isConst), ident(std::move(_ident)) {
+  DefAST(bool _is_const, std::string _ident, BaseAST *_initVal)
+      : is_const(_is_const), ident(std::move(_ident)) {
     if (_initVal) {
       initVal.reset(static_cast<ExprAST *>(_initVal));
     }
@@ -178,34 +160,21 @@ public:
 };
 
 /**
- * @brief AST node for function calls.
- */
-class FuncCallAST : public BaseAST {
-public:
-  std::string ident;
-  std::vector<std::unique_ptr<ExprAST>> args;
-  /**
-   * @brief Constructs a function call.
-   * @param _ident The function name.
-   * @param _args The list of expression arguments.
-   */
-  FuncCallAST(std::string _ident, std::vector<std::unique_ptr<ExprAST>> _args)
-      : ident(std::move(_ident)), args(std::move(_args)) {}
-  auto dump(int depth) const -> void override;
-  auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
-};
-
-//* stmt ast begin
-/**
  * @brief Base class for all statement AST nodes.
+ *
+ ** StmtAST indicates a side effect: the statement itself does not return a
+ ** value, but it modifies the memory state or changes the control flow.
  */
 class StmtAST : public BaseAST {};
 
-/**
- * @brief AST node for a block of code (enclosed in { }).
+/** @name Container & Bridge
+ * @{
+ * @brief A collection of statements (enclosed in { }), usually accompanied by
+ * the opening of scope.
  */
 class BlockAST : public StmtAST {
 public:
+  //* Semantically, it should be StmtAST, but for convenience, BaseAST is used.
   std::vector<std::unique_ptr<BaseAST>> items;
   bool createScope = true;
   /**
@@ -219,17 +188,17 @@ public:
 };
 
 /**
- * @brief AST node for return statements.
+ * @brief Expressions degenerate into statements (e.g., "x + 1;").
  */
-class ReturnStmtAST : public StmtAST {
+class ExprStmtAST : public StmtAST {
 public:
   // return expr
   std::unique_ptr<ExprAST> expr;
   /**
-   * @brief Constructs a return statement.
-   * @param _expr The return value expression (optional).
+   * @brief Constructs an expression statement.
+   * @param _expr The expression to evaluate.
    */
-  ReturnStmtAST(BaseAST *_expr) {
+  ExprStmtAST(BaseAST *_expr) {
     if (_expr) {
       expr.reset(static_cast<ExprAST *>(_expr));
     }
@@ -237,9 +206,11 @@ public:
   auto dump(int depth) const -> void override;
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };
+/** @} */
 
-/**
+/** @name Data Action
  * @brief AST node for assignment statements.
+ * @{
  */
 class AssignStmtAST : public StmtAST {
 public:
@@ -258,17 +229,39 @@ public:
 };
 
 /**
- * @brief AST node for expression statements (e.g., "x + 1;").
+ * @brief AST node for declarations (e.g., int a, b = 1;).
  */
-class ExprStmtAST : public StmtAST {
+class DeclAST : public StmtAST {
 public:
-  // return expr
+  bool is_const;
+  std::string btype;
+  std::vector<std::unique_ptr<DefAST>> defs;
+  /**
+   * @brief Constructs a declaration node.
+   * @param _is_const Whether the variables are constant.
+   * @param _btype The type of the variables.
+   * @param _defs The list of variable definitions.
+   */
+  DeclAST(bool _isConst, std::string _btype,
+          std::vector<std::unique_ptr<DefAST>> _defs)
+      : is_const(_isConst), btype(std::move(_btype)), defs(std::move(_defs)) {}
+  auto dump(int depth) const -> void override;
+  auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
+};
+/** @} */
+
+/** @name Control Flow
+ * @{
+ * @brief AST node for return statements.
+ */
+class ReturnStmtAST : public StmtAST {
+public:
   std::unique_ptr<ExprAST> expr;
   /**
-   * @brief Constructs an expression statement.
-   * @param _expr The expression to evaluate.
+   * @brief Constructs a return statement.
+   * @param _expr The return value expression (optional).
    */
-  ExprStmtAST(BaseAST *_expr) {
+  ReturnStmtAST(BaseAST *_expr) {
     if (_expr) {
       expr.reset(static_cast<ExprAST *>(_expr));
     }
@@ -320,26 +313,18 @@ public:
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };
 
-/**
- * @brief AST node for break statements.
- */
 class BreakStmtAST : public StmtAST {
 public:
   auto dump(int depth) const -> void override;
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };
 
-/**
- * @brief AST node for continue statements.
- */
 class ContinueStmtAST : public StmtAST {
 public:
   auto dump(int depth) const -> void override;
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };
-//* stmt ast end
-
-//* epxr AST begin
+/** @} */
 
 /**
  * @brief AST node for literal numbers.
@@ -357,9 +342,6 @@ public:
   auto CalcValue(ir::KoopaBuilder &builder) const -> int override;
 };
 
-/**
- * @brief AST node for left-values (variables).
- */
 class LValAST : public ExprAST {
 public:
   std::string ident;
@@ -374,8 +356,24 @@ public:
 };
 
 /**
- * @brief AST node for unary expressions (e.g., -x, !x).
+ * @brief AST node for function calls.
  */
+class FuncCallAST : public ExprAST {
+public:
+  std::string ident;
+  std::vector<std::unique_ptr<ExprAST>> args;
+  /**
+   * @brief Constructs a function call.
+   * @param _ident The function name.
+   * @param _args The list of expression arguments.
+   */
+  FuncCallAST(std::string _ident, std::vector<std::unique_ptr<ExprAST>> _args)
+      : ident(std::move(_ident)), args(std::move(_args)) {}
+  auto dump(int depth) const -> void override;
+  auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
+  auto CalcValue(ir::KoopaBuilder &builder) const -> int override;
+};
+
 class UnaryExprAST : public ExprAST {
 public:
   UnaryOp op;
@@ -397,9 +395,6 @@ public:
   auto CalcValue(ir::KoopaBuilder &builder) const -> int override;
 };
 
-/**
- * @brief AST node for binary expressions (e.g., a + b).
- */
 class BinaryExprAST : public ExprAST {
 public:
   BinaryOp op;
@@ -426,8 +421,6 @@ public:
   auto CalcValue(ir::KoopaBuilder &builder) const -> int override;
 };
 
-//* expr AST end
-
 }; // namespace ast
 
 /**
@@ -442,11 +435,6 @@ export namespace detail {
  */
 auto inline indent(int d) -> std::string { return std::string(d * 2, ' '); }
 
-/**
- * @brief Converts a BinaryOp to its string representation.
- * @param op The binary operator.
- * @return The string name of the operator.
- */
 auto inline opToString(ast::BinaryOp op) -> std::string {
   // clang-format off
   switch (op) {

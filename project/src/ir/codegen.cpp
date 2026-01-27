@@ -71,7 +71,7 @@ auto FuncParamAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   if (btype == "void") {
     Log::panic("Semantic Error: Variable cannot be of type 'void'");
   }
-  if (isConst) {
+  if (is_const) {
     builder.symtab().define(ident, "", type::IntType::get(), SymbolKind::Var,
                             true, 0);
   } else {
@@ -160,25 +160,6 @@ auto FuncDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 }
 
 /**
- * @brief Generates IR for variable/constant declarations.
- *
- * Checks for invalid 'void' types and generates IR for each variable
- * definition.
- *
- * @param builder The IR builder context.
- * @return An empty string.
- */
-auto DeclAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
-  if (btype == "void") {
-    Log::panic("Semantic Error: Variable cannot be of type 'void'");
-  }
-  for (const auto &def : defs) {
-    def->codeGen(builder);
-  }
-  return "";
-}
-
-/**
  * @brief Generates IR for a single variable definition (Def).
  *
  * Handles both global and local variables:
@@ -198,7 +179,7 @@ auto DefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
       val = initVal->CalcValue(builder);
       has_init = true;
     }
-    if (isConst) {
+    if (is_const) {
       builder.symtab().defineGlobal(ident, "", type::IntType::get(),
                                     SymbolKind::Var, true, val);
     } else {
@@ -213,7 +194,7 @@ auto DefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     }
   } else {
     // const btype var = value
-    if (isConst) {
+    if (is_const) {
       int val = 0;
       if (initVal) {
         val = initVal->CalcValue(builder);
@@ -235,41 +216,6 @@ auto DefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   return "";
 }
 
-/**
- * @brief Generates IR for a function call.
- *
- * Lookups the function in the symbol table, generates IR for arguments,
- * and appends a 'call' instruction.
- *
- * @param builder The IR builder context.
- * @return The register name holding the return value (if any).
- */
-auto FuncCallAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
-  auto sym = builder.symtab().lookup(ident);
-  if (!sym) {
-    Log::panic(fmt::format("Undefined function '{}'", ident));
-  }
-
-  std::vector<std::string> arg_val;
-  for (const auto &arg : args) {
-    arg_val.emplace_back(arg->codeGen(builder));
-  }
-  std::string ret_reg;
-  if (sym->type->is_void()) {
-    builder.append(fmt::format("  call @{}(", ident));
-  } else {
-    ret_reg = builder.newReg();
-    builder.append(fmt::format("  {} = call @{}(", ret_reg, ident));
-  }
-  for (const auto &val : arg_val) {
-    builder.append(val);
-    if (&val != &arg_val.back()) {
-      builder.append(", ");
-    }
-  }
-  builder.append(")\n");
-  return ret_reg;
-}
 
 /**
  * @brief Generates IR for a block of statements (enclosed in { }).
@@ -301,21 +247,17 @@ auto BlockAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 }
 
 /**
- * @brief Generates IR for a return statement.
+ * @brief Generates IR for an expression statement.
  *
- * Evaluates the return expression (if present) and appends a 'ret' instruction.
- * Marks the current basic block as closed.
+ * Simply evaluates the expression. The result is discarded.
  *
  * @param builder The IR builder context.
  * @return An empty string.
  */
-auto ReturnStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
-  std::string ret_val;
+auto ExprStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   if (expr) {
-    ret_val = expr->codeGen(builder);
+    expr->codeGen(builder);
   }
-  builder.setBlockClose();
-  builder.append(fmt::format("  ret {}\n", ret_val));
   return "";
 }
 
@@ -336,7 +278,7 @@ auto AssignStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
         fmt::format("Assignment to undefined variable '{}'", lval->ident));
   }
   //* lval(sym) = val_reg
-  if (sym->isConst) {
+  if (sym->is_const) {
     Log::panic(
         fmt::format("Error: Cannot assign to const variable '{}'", sym->name));
   }
@@ -345,17 +287,40 @@ auto AssignStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 }
 
 /**
- * @brief Generates IR for an expression statement.
+ * @brief Generates IR for variable/constant declarations.
  *
- * Simply evaluates the expression. The result is discarded.
+ * Checks for invalid 'void' types and generates IR for each variable
+ * definition.
  *
  * @param builder The IR builder context.
  * @return An empty string.
  */
-auto ExprStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
-  if (expr) {
-    expr->codeGen(builder);
+auto DeclAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
+  if (btype == "void") {
+    Log::panic("Semantic Error: Variable cannot be of type 'void'");
   }
+  for (const auto &def : defs) {
+    def->codeGen(builder);
+  }
+  return "";
+}
+
+/**
+ * @brief Generates IR for a return statement.
+ *
+ * Evaluates the return expression (if present) and appends a 'ret' instruction.
+ * Marks the current basic block as closed.
+ *
+ * @param builder The IR builder context.
+ * @return An empty string.
+ */
+auto ReturnStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
+  std::string ret_val;
+  if (expr) {
+    ret_val = expr->codeGen(builder);
+  }
+  builder.setBlockClose();
+  builder.append(fmt::format("  ret {}\n", ret_val));
   return "";
 }
 
@@ -422,6 +387,7 @@ auto WhileStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   std::string entry_label = builder.newLabel("while_entry", id);
   std::string body_label = builder.newLabel("while_body", id);
   std::string end_label = builder.newLabel("while_end", id);
+
   builder.pushLoop(entry_label, end_label);
   builder.append(fmt::format("  jump {}\n", entry_label));
 
@@ -475,6 +441,7 @@ auto ContinueStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   return "";
 }
 
+
 /**
  * @brief Generates IR for a literal number.
  *
@@ -503,12 +470,48 @@ auto LValAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     Log::panic(fmt::format("Undefined variable: '{}'", ident));
   }
   //* we can calculate const value in compile time
-  if (sym->isConst) {
+  if (sym->is_const) {
     return std::to_string(sym->constValue);
   }
   std::string reg = builder.newReg();
   builder.append(fmt::format("  {} = load {}\n", reg, sym->irName));
   return reg;
+}
+
+/**
+ * @brief Generates IR for a function call.
+ *
+ * Lookups the function in the symbol table, generates IR for arguments,
+ * and appends a 'call' instruction.
+ *
+ * @param builder The IR builder context.
+ * @return The register name holding the return value (if any).
+ */
+auto FuncCallAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
+  auto sym = builder.symtab().lookup(ident);
+  if (!sym) {
+    Log::panic(fmt::format("Undefined function '{}'", ident));
+  }
+
+  std::vector<std::string> arg_val;
+  for (const auto &arg : args) {
+    arg_val.emplace_back(arg->codeGen(builder));
+  }
+  std::string ret_reg;
+  if (sym->type->is_void()) {
+    builder.append(fmt::format("  call @{}(", ident));
+  } else {
+    ret_reg = builder.newReg();
+    builder.append(fmt::format("  {} = call @{}(", ret_reg, ident));
+  }
+  for (const auto &val : arg_val) {
+    builder.append(val);
+    if (&val != &arg_val.back()) {
+      builder.append(", ");
+    }
+  }
+  builder.append(")\n");
+  return ret_reg;
 }
 
 /**
@@ -625,6 +628,7 @@ auto BinaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   return ret_reg;
 }
 
+
 /**
  * @brief Evaluates a literal number at compile time.
  * @param builder The IR builder context.
@@ -649,12 +653,27 @@ auto LValAST::CalcValue(ir::KoopaBuilder &builder) const -> int {
     Log::panic(
         fmt::format("Undefined variable '{}' in constant expression", ident));
   }
-  if (!sym->isConst) {
+  if (!sym->is_const) {
     Log::panic(fmt::format("Variable '{}' is not a constant, cannot be used in "
                            "constant expression",
                            ident));
   }
   return sym->constValue;
+}
+
+/**
+ * @brief sysy does not support compile-time function evaluation and should
+ * throw an error.
+ * @param builder The IR builder context.
+ * @return The return value should be undefined; here, it defaults to returning
+ * zero.
+ */
+auto FuncCallAST::CalcValue([[maybe_unused]] ir::KoopaBuilder &builder) const
+    -> int {
+  Log::panic(fmt::format(
+      "Semantic Error: Function call '{}' is not a constant expression",
+      ident));
+  return 0;
 }
 
 /**

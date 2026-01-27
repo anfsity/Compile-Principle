@@ -20,7 +20,6 @@ using namespace ast;
 using namespace detail;
 
 // Destructors to solve the problem of forward declaration with smart pointers
-DeclAST::~DeclAST() = default;
 AssignStmtAST::~AssignStmtAST() = default;
 FuncDefAST::~FuncDefAST() = default;
 
@@ -38,16 +37,6 @@ FuncDefAST::FuncDefAST(std::string _btype, std::string _ident,
       params(std::move(_params)), block(static_cast<BlockAST *>(_block)) {}
 
 /**
- * @brief Constructs a DeclAST node.
- * @param _isConst Whether it's a constant declaration.
- * @param _btype Base type of the declaration.
- * @param _defs List of variable definitions.
- */
-DeclAST::DeclAST(bool _isConst, std::string _btype,
-                 std::vector<std::unique_ptr<DefAST>> _defs)
-    : isConst(_isConst), btype(std::move(_btype)), defs(std::move(_defs)) {}
-
-/**
  * @brief Constructs an AssignStmtAST node.
  * @param _lval Left-hand side variable (LVal).
  * @param _expr Right-hand side expression.
@@ -60,6 +49,7 @@ AssignStmtAST::AssignStmtAST(BaseAST *_lval, BaseAST *_expr) {
     expr.reset(static_cast<ExprAST *>(_expr));
   }
 }
+
 
 /**
  * @brief Dumps CompUnitAST node details.
@@ -78,7 +68,7 @@ auto CompUnitAST::dump(int depth) const -> void {
  */
 auto FuncParamAST::dump(int depth) const -> void {
   fmt::println("{}FuncParamAST: {} {} type: {}", indent(depth), ident,
-               (isConst ? "const" : ""), btype);
+               (is_const ? "const" : ""), btype);
 }
 
 /**
@@ -96,18 +86,6 @@ auto FuncDefAST::dump(int depth) const -> void {
 }
 
 /**
- * @brief Dumps DeclAST node details.
- * @param depth Indentation depth.
- */
-auto DeclAST::dump(int depth) const -> void {
-  std::string declType = isConst ? "ConstDecl" : "VarDecl";
-  fmt::println("{}{}: {}", indent(depth), declType, btype);
-  for (const auto &def : defs) {
-    def->dump(depth + 1);
-  }
-}
-
-/**
  * @brief Dumps DefAST node details.
  * @param depth Indentation depth.
  */
@@ -118,16 +96,6 @@ auto DefAST::dump(int depth) const -> void {
   }
 }
 
-/**
- * @brief Dumps FuncCallAST node details.
- * @param depth Indentation depth.
- */
-auto FuncCallAST::dump(int depth) const -> void {
-  fmt::println("{}FuncCallAST: {}", indent(depth), ident);
-  for (const auto &arg : args) {
-    arg->dump(depth + 1);
-  }
-}
 
 /**
  * @brief Dumps BlockAST node details.
@@ -139,6 +107,18 @@ auto BlockAST::dump(int depth) const -> void {
     item->dump(depth + 1);
   }
 }
+
+/**
+ * @brief Dumps ExprStmtAST node details.
+ * @param depth Indentation depth.
+ */
+auto ExprStmtAST::dump(int depth) const -> void {
+  fmt::println("{}ExprStmtAST:", indent(depth));
+  if (expr) {
+    expr->dump(depth + 1);
+  }
+}
+
 
 /**
  * @brief Dumps ReturnStmtAST node details.
@@ -161,16 +141,19 @@ auto AssignStmtAST::dump(int depth) const -> void {
   expr->dump(depth + 1);
 }
 
+
 /**
- * @brief Dumps ExprStmtAST node details.
+ * @brief Dumps DeclAST node details.
  * @param depth Indentation depth.
  */
-auto ExprStmtAST::dump(int depth) const -> void {
-  fmt::println("{}ExprStmtAST:", indent(depth));
-  if (expr) {
-    expr->dump(depth + 1);
+auto DeclAST::dump(int depth) const -> void {
+  std::string declType = is_const ? "ConstDecl" : "VarDecl";
+  fmt::println("{}{}: {}", indent(depth), declType, btype);
+  for (const auto &def : defs) {
+    def->dump(depth + 1);
   }
 }
+
 
 /**
  * @brief Dumps IfStmtAST node details.
@@ -219,6 +202,7 @@ auto ContinueStmtAST::dump(int depth) const -> void {
   fmt::println("{}ContinueAST", indent(depth));
 }
 
+
 /**
  * @brief Dumps NumberAST node details.
  * @param depth Indentation depth.
@@ -233,6 +217,17 @@ auto NumberAST::dump(int depth) const -> void {
  */
 auto LValAST::dump(int depth) const -> void {
   fmt::println("{}LValAST: {}", indent(depth), ident);
+}
+
+/**
+ * @brief Dumps FuncCallAST node details.
+ * @param depth Indentation depth.
+ */
+auto FuncCallAST::dump(int depth) const -> void {
+  fmt::println("{}FuncCallAST: {}", indent(depth), ident);
+  for (const auto &arg : args) {
+    arg->dump(depth + 1);
+  }
 }
 
 /**
