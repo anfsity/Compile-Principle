@@ -111,10 +111,12 @@ public:
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };
 
+class DefAST : public BaseAST {};
+
 /**
  * @brief AST node for function definitions.
  */
-class FuncDefAST : public BaseAST {
+class FuncDefAST : public DefAST {
 public:
   ~FuncDefAST() override;
   std::string btype;
@@ -135,10 +137,26 @@ public:
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };
 
+class ArrayDefAST : public DefAST {
+public:
+  bool is_const;
+  std::string ident;
+  std::unique_ptr<ExprAST> expr;
+  std::vector<std::unique_ptr<ExprAST>> initialize_list;
+  ArrayDefAST(bool _is_const, std::string _ident, BaseAST *_expr,
+              std::vector<std::unique_ptr<ExprAST>> _initialize_list)
+      : is_const(_is_const), ident(std::move(_ident)),
+        initialize_list(std::move(_initialize_list)) {
+    expr.reset(static_cast<ExprAST *>(_expr));
+  }
+  auto dump(int depth) const -> void override;
+  auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
+};
+
 /**
  * @brief AST node for a single variable definition.
  */
-class DefAST : public BaseAST {
+class ScalarDefAST : public DefAST {
 public:
   bool is_const;
   std::string ident;
@@ -149,7 +167,7 @@ public:
    * @param _ident The name of the variable.
    * @param _initVal The initial value expression (optional).
    */
-  DefAST(bool _is_const, std::string _ident, BaseAST *_initVal)
+  ScalarDefAST(bool _is_const, std::string _ident, BaseAST *_initVal)
       : is_const(_is_const), ident(std::move(_ident)) {
     if (_initVal) {
       initVal.reset(static_cast<ExprAST *>(_initVal));
@@ -242,9 +260,9 @@ public:
    * @param _btype The type of the variables.
    * @param _defs The list of variable definitions.
    */
-  DeclAST(bool _isConst, std::string _btype,
+  DeclAST(bool _is_const, std::string _btype,
           std::vector<std::unique_ptr<DefAST>> _defs)
-      : is_const(_isConst), btype(std::move(_btype)), defs(std::move(_defs)) {}
+      : is_const(_is_const), btype(std::move(_btype)), defs(std::move(_defs)) {}
   auto dump(int depth) const -> void override;
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };
@@ -345,11 +363,14 @@ public:
 class LValAST : public ExprAST {
 public:
   std::string ident;
+  std::unique_ptr<ExprAST> index;
   /**
    * @brief Constructs an LVal node.
    * @param _ident The variable name.
    */
-  LValAST(std::string _ident) : ident(std::move(_ident)) {};
+  LValAST(std::string _ident, BaseAST *_index) : ident(std::move(_ident)) {
+    index.reset(static_cast<ExprAST *>(_index));
+  };
   auto dump(int depth) const -> void override;
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
   auto CalcValue(ir::KoopaBuilder &builder) const -> int override;

@@ -6,9 +6,9 @@
 module;
 
 #include <fmt/core.h>
+#include <map>
 #include <memory>
 #include <string>
-#include <vector>
 
 export module ir.type;
 
@@ -31,6 +31,7 @@ public:
   virtual auto is_ptr() const -> bool { return false; }
   virtual auto is_bool() const -> bool { return false; }
   virtual auto is_float() const -> bool { return false; }
+  virtual auto is_array() const -> bool { return false; }
 };
 
 /**
@@ -108,16 +109,42 @@ class PtrType : public Type {
 public:
   std::shared_ptr<Type> target; ///< The type being pointed to.
 
-  /**
-   * @brief Constructs a pointer type.
-   * @param t The base type.
-   */
   PtrType(std::shared_ptr<Type> t) : target(t) {};
 
   auto debug() const -> std::string override {
     return fmt::format("*{}", target->debug());
   }
   auto is_ptr() const -> bool override { return true; }
+
+  static auto get(std::shared_ptr<Type> t) -> std::shared_ptr<PtrType> {
+    return std::make_shared<PtrType>(t);
+  }
+};
+
+class ArrayType : public Type {
+public:
+  std::shared_ptr<Type> base;
+  int len;
+
+  ArrayType(std::shared_ptr<Type> t, int _len) : base(t), len(_len) {}
+
+  auto debug() const -> std::string override {
+    return fmt::format("Array type (len : {}): {}", len, base->debug());
+  }
+  auto is_array() const -> bool override { return true; }
+
+  static auto get(std::shared_ptr<Type> _base, int _len)
+      -> std::shared_ptr<ArrayType> {
+    static std::map<std::pair<std::shared_ptr<Type>, int>,
+                    std::shared_ptr<ArrayType>>
+        cache;
+    auto key = std::make_pair(_base, _len);
+    if (cache.contains(key)) {
+      return cache[key];
+    }
+    auto instance = std::make_shared<ArrayType>(_base, _len);
+    return cache[key] = instance;
+  }
 };
 
 } // namespace type

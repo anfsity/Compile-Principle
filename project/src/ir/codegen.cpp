@@ -26,6 +26,7 @@ module;
 
 #include <cassert>
 #include <fmt/core.h>
+#include <ranges>
 #include <string>
 #include <vector>
 
@@ -159,6 +160,64 @@ auto FuncDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   return "";
 }
 
+auto ArrayDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
+  int len = expr->CalcValue(builder);
+
+  if (builder.symtab().isGlobalScope()) {
+    //! [Caution] : Since global variables do not have naming conflicts, we
+    //! will consistently use ident without the prefix.
+    if (ssize(initialize_list) == 0) {
+      builder.append(
+          fmt::format("global @{} = alloc [i32, {}], zeroinit\n", ident, len));
+    } else {
+      builder.append(
+          fmt::format("global @{} = alloc [i32, {}], {{", ident, len));
+
+      for (const auto &[i, elem] : std::views::enumerate(initialize_list)) {
+        builder.append(fmt::format("{}", elem->CalcValue(builder)));
+        if (i < len - 1) {
+          builder.append(", ");
+        }
+      }
+      for (int i = ssize(initialize_list); i < len; ++i) {
+        builder.append("0");
+        if (i < len - 1) {
+          builder.append(", ");
+        }
+      }
+
+      builder.append("}\n");
+
+      builder.symtab().defineGlobal(
+          ident, "@" + ident, type::ArrayType::get(type::IntType::get(), len),
+          SymbolKind::Var, is_const);
+    }
+  } else {
+
+    auto addr = builder.newVar(ident);
+    builder.append(fmt::format("  {} = alloc [i32, {}]\n", addr, len));
+    for (const auto &[i, elem] : std::views::enumerate(initialize_list)) {
+      auto tmp_reg = builder.newReg();
+      builder.append(
+          fmt::format("  {} = getelemptr {}, {}\n", tmp_reg, addr, i));
+      builder.append(
+          fmt::format("  store {}, {}\n", elem->CalcValue(builder), tmp_reg));
+    }
+    for (int i = ssize(initialize_list); i < len; ++i) {
+      auto tmp_reg = builder.newReg();
+      builder.append(
+          fmt::format("  {} = getelemptr {}, {}\n", tmp_reg, addr, i));
+      builder.append(fmt::format("  store 0, {}\n", tmp_reg));
+    }
+
+    builder.symtab().define(ident, addr,
+                            type::ArrayType::get(type::IntType::get(), len),
+                            SymbolKind::Var, is_const);
+  }
+
+  return "";
+}
+
 /**
  * @brief Generates IR for a single variable definition (Def).
  *
@@ -171,11 +230,14 @@ auto FuncDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
  * @param builder The IR builder context.
  * @return An empty string.
  */
-auto DefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
+auto ScalarDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   if (builder.symtab().isGlobalScope()) {
     int val = 0;
     bool has_init = false;
     if (initVal) {
+      // NOTE: No need to check `initval` here, because `const int a;` and
+      // similar statements are not implemented and will result in an error at
+      // the syntax parsing stage.
       val = initVal->CalcValue(builder);
       has_init = true;
     }
@@ -215,7 +277,6 @@ auto DefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   }
   return "";
 }
-
 
 /**
  * @brief Generates IR for a block of statements (enclosed in { }).
@@ -282,7 +343,16 @@ auto AssignStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     Log::panic(
         fmt::format("Error: Cannot assign to const variable '{}'", sym->name));
   }
-  builder.append(fmt::format("  store {}, {}\n", val_reg, sym->irName));
+
+  if (lval->index) {
+    auto tmp_reg = builder.newReg();
+    builder.append(fmt::format("  {} = getelemptr {}, {}\n", tmp_reg,
+                               sym->irName, lval->index->codeGen(builder)));
+    builder.append(fmt::format("  store {}, {}\n", val_reg, tmp_reg));
+  } else {
+    builder.append(fmt::format("  store {}, {}\n", val_reg, sym->irName));
+  }
+
   return "";
 }
 
@@ -441,7 +511,6 @@ auto ContinueStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   return "";
 }
 
-
 /**
  * @brief Generates IR for a literal number.
  *
@@ -470,11 +539,23 @@ auto LValAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     Log::panic(fmt::format("Undefined variable: '{}'", ident));
   }
   //* we can calculate const value in compile time
-  if (sym->is_const) {
+  if (sym->is_const && !index) {
     return std::to_string(sym->constValue);
   }
   std::string reg = builder.newReg();
-  builder.append(fmt::format("  {} = load {}\n", reg, sym->irName));
+  if (index) {
+    auto lval_reg = index->codeGen(builder);
+    builder.append(
+        fmt::format("  {} = getelemptr {}, {}\n", reg, sym->irName, lval_reg));
+
+    // allocate new reg
+    std::string old_reg = reg;
+    reg = builder.newReg();
+
+    builder.append(fmt::format("  {} = load {}\n", reg, old_reg));
+  } else {
+    builder.append(fmt::format("  {} = load {}\n", reg, sym->irName));
+  }
   return reg;
 }
 
@@ -497,6 +578,7 @@ auto FuncCallAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   for (const auto &arg : args) {
     arg_val.emplace_back(arg->codeGen(builder));
   }
+
   std::string ret_reg;
   if (sym->type->is_void()) {
     builder.append(fmt::format("  call @{}(", ident));
@@ -504,6 +586,7 @@ auto FuncCallAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     ret_reg = builder.newReg();
     builder.append(fmt::format("  {} = call @{}(", ret_reg, ident));
   }
+
   for (const auto &val : arg_val) {
     builder.append(val);
     if (&val != &arg_val.back()) {
@@ -511,6 +594,7 @@ auto FuncCallAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     }
   }
   builder.append(")\n");
+
   return ret_reg;
 }
 
@@ -547,6 +631,7 @@ auto UnaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
  * @return The register name holding the result.
  */
 auto BinaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
+
   if (op == BinaryOp::And) {
     std::string tmp_addr = builder.newVar("and_res");
     builder.append(fmt::format("  {} = alloc i32\n", tmp_addr));
@@ -582,6 +667,7 @@ auto BinaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 
     return ret_reg;
   }
+
   if (op == BinaryOp::Or) {
     std::string tmp_addr = builder.newVar("or_res");
     builder.append(fmt::format("  {} = alloc i32\n", tmp_addr));
@@ -618,6 +704,7 @@ auto BinaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 
     return ret_reg;
   }
+
   // remain binary operator
   std::string lhs_reg = lhs->codeGen(builder);
   std::string rhs_reg = rhs->codeGen(builder);
@@ -627,7 +714,6 @@ auto BinaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
       fmt::format("  {} = {} {}, {}\n", ret_reg, ir_op, lhs_reg, rhs_reg));
   return ret_reg;
 }
-
 
 /**
  * @brief Evaluates a literal number at compile time.
@@ -649,6 +735,7 @@ auto NumberAST::CalcValue([[maybe_unused]] ir::KoopaBuilder &builder) const
  */
 auto LValAST::CalcValue(ir::KoopaBuilder &builder) const -> int {
   auto sym = builder.symtab().lookup(ident);
+  Log::trace(ident);
   if (!sym) {
     Log::panic(
         fmt::format("Undefined variable '{}' in constant expression", ident));

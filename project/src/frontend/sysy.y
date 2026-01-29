@@ -64,13 +64,21 @@ void yyerror(std::unique_ptr<BaseAST> &ast, const char *str);
 %type <ast_val> ConstDef VarDef BlockItem Decl ConstDecl VarDecl
 %type <ast_val> CompUnitItem CompUnit FuncFParam
 %type <funcParams_val> FuncFParams
-%type <args_val> FuncRParams
+%type <args_val> FuncRParams InitializeList InitVal
 %type <children_val> CompUnitItemList
 %type <items_val> BlockItemList
 %type <defs_val> VarDefList ConstDefList
 
 %nonassoc LOWER_ELSE
 %nonassoc ELSE
+
+/* 
+VarDef        ::= IDENT ["[" ConstExp "]"]
+                | IDENT ["[" ConstExp "]"] "=" InitVal;
+InitVal       ::= Exp | "{" [Exp {"," Exp}] "}";
+
+LVal          ::= IDENT ["[" Exp "]"];
+*/
 
 %left OR                  // ||
 %left AND                 // &&
@@ -194,18 +202,48 @@ ConstDefList
   : ConstDef {
     $$ = new std::vector<std::unique_ptr<DefAST>>();
     // this is a pointer , so we don't need move optimize.
-    $$->push_back(std::unique_ptr<DefAST>(static_cast<DefAST *>($1)));
+    $$->push_back(std::unique_ptr<DefAST>(static_cast<ScalarDefAST *>($1)));
   }
   | ConstDefList ',' ConstDef {
     $$ = $1;
-    $$->push_back(std::unique_ptr<DefAST>(static_cast<DefAST *>($3)));
+    $$->push_back(std::unique_ptr<DefAST>(static_cast<ScalarDefAST *>($3)));
   };
 
 ConstDef 
   : IDENT '=' Expr {
-    $$ = new DefAST(true, std::move(*$1), $3);
+    // @param is_const, ident, exprAST
+    $$ = new ScalarDefAST(true, std::move(*$1), $3);
     delete $1;
+  }
+  | IDENT '[' Expr ']' '=' InitVal {
+    $$ = new ArrayDefAST(true, std::move(*$1), $3, std::move(*$6));
+    delete $1;
+    delete $6;
   };
+
+InitVal
+  : '{' '}' {
+    $$ = new std::vector<std::unique_ptr<ExprAST>>();
+  }
+  | '{' InitializeList '}' {
+    $$ = $2;
+  };
+
+InitializeList
+  : Expr {
+    $$ = new std::vector<std::unique_ptr<ExprAST>>();
+    $$->push_back(std::unique_ptr<ExprAST>(static_cast<ExprAST *>($1)));
+  }
+  | InitializeList ',' Expr {
+    $$ = $1;
+    $$->push_back(std::unique_ptr<ExprAST>(static_cast<ExprAST *>($3)));
+  };
+
+/*
+Initialize list
+ConstDef      ::= IDENT ["[" ConstExp "]"] "=" ConstInitVal;
+ConstInitVal  ::= ConstExp | "{" [ConstExp {"," ConstExp}] "}";
+*/
 
 VarDecl
   : Btype VarDefList ';' {
@@ -217,22 +255,36 @@ VarDecl
 VarDefList
   : VarDef {
     $$ = new std::vector<std::unique_ptr<DefAST>>();
-    $$->push_back(std::unique_ptr<DefAST>(static_cast<DefAST *>($1)));
+    $$->push_back(std::unique_ptr<DefAST>(static_cast<ScalarDefAST *>($1)));
   };
   | VarDefList ',' VarDef {
     $$ = $1;
-    $$->push_back(std::unique_ptr<DefAST>(static_cast<DefAST *>($3)));
+    $$->push_back(std::unique_ptr<DefAST>(static_cast<ScalarDefAST *>($3)));
   };
 
 VarDef 
   : IDENT '=' Expr {
-    $$ = new DefAST(false, std::move(*$1), $3);
+    $$ = new ScalarDefAST(false, std::move(*$1), $3);
     delete $1;
   };
   | IDENT {
-    $$ = new DefAST(false, std::move(*$1), nullptr);
+    $$ = new ScalarDefAST(false, std::move(*$1), nullptr);
     delete $1;
+  }  
+  | IDENT '[' Expr ']' {
+    $$ = new ArrayDefAST(false, std::move(*$1), $3, {});
+    delete $1;
+  }
+  | IDENT '[' Expr ']' '=' InitVal {
+    $$ = new ArrayDefAST(false, std::move(*$1), $3, std::move(*$6));
+    delete $1;
+    delete $6;
   };
+
+/*
+VarDef        ::= IDENT ["[" ConstExp "]"]
+                | IDENT ["[" ConstExp "]"] "=" InitVal;
+*/
 
 Btype
   : INT { $$ = new std::string("int"); }
@@ -352,7 +404,11 @@ Number
 
 LVal 
   : IDENT {
-    $$ = new LValAST(std::move(*$1));
+    $$ = new LValAST(std::move(*$1), nullptr);
+    delete $1;
+  }
+  | IDENT '[' Expr ']' {
+    $$ = new LValAST(std::move(*$1), $3);
     delete $1;
   };
 

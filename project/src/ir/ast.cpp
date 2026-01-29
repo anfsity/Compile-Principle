@@ -85,12 +85,16 @@ auto FuncDefAST::dump(int depth) const -> void {
   }
 }
 
+auto ArrayDefAST::dump(int depth) const -> void {
+  fmt::println("{}ArrayDefAST: {}", indent(depth), ident);
+}
+
 /**
- * @brief Dumps DefAST node details.
+ * @brief Dumps ScalarDefAST node details.
  * @param depth Indentation depth.
  */
-auto DefAST::dump(int depth) const -> void {
-  fmt::println("{}DefAST: {}", indent(depth), ident);
+auto ScalarDefAST::dump(int depth) const -> void {
+  fmt::println("{}ScalarDefAST: {}", indent(depth), ident);
   if (initVal) {
     initVal->dump(depth + 1);
   }

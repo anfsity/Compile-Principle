@@ -1,6 +1,5 @@
-int a = 10;
-
-int inc() {
-  a = a + 1;
-  return a;
+int main() {
+  int arr[10];
+  int n = getarray(arr);
+  return 0;
 }
