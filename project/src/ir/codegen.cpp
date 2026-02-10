@@ -367,7 +367,9 @@ auto InitValStmtAST::codeGen([[maybe_unused]] ir::KoopaBuilder &builder) const
     -> std::string {
   //! No node should call `InitValStmtAST`'s `codeGen` function, as it is only
   //! responsible for expanding the initialize list, not for generating code.
-  Log::panic("");
+  Log::panic("InitValStmtAST::codeGen was called unexpectedly. This node is "
+             "only used to expand initializer lists and must not generate "
+             "IR directly.");
   return "";
 }
 

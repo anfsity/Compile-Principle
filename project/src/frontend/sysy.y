@@ -175,7 +175,7 @@ FuncFParam
     delete $3;
   }
   | CONST Btype IDENT ParamArraySuffix {
-    $$ = new FuncParamAST(std::move(*$3), std::move(*$3), true, true, std::move(*$4));
+    $$ = new FuncParamAST(std::move(*$2), std::move(*$3), true, true, std::move(*$4));
     delete $2;
     delete $3;
     delete $4;
