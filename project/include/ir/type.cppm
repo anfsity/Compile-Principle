@@ -24,7 +24,7 @@ public:
   /**
    * @brief Returns a string representation of the type.
    */
-  virtual auto debug() const -> std::string = 0;
+  virtual auto toKoopa() const -> std::string = 0;
 
   virtual auto is_int() const -> bool { return false; }
   virtual auto is_void() const -> bool { return false; }
@@ -39,7 +39,7 @@ public:
  */
 class IntType : public Type {
 public:
-  auto debug() const -> std::string override { return "i32"; }
+  auto toKoopa() const -> std::string override { return "i32"; }
   auto is_int() const -> bool override { return true; }
 
   /**
@@ -56,7 +56,7 @@ public:
  */
 class VoidType : public Type {
 public:
-  auto debug() const -> std::string override { return "void"; }
+  auto toKoopa() const -> std::string override { return "void"; }
   auto is_void() const -> bool override { return true; }
 
   /**
@@ -73,7 +73,7 @@ public:
  */
 class BoolType : public Type {
 public:
-  auto debug() const -> std::string override { return "bool"; }
+  auto toKoopa() const -> std::string override { return "bool"; }
   auto is_bool() const -> bool override { return true; }
 
   /**
@@ -90,7 +90,7 @@ public:
  */
 class FloatType : public Type {
 public:
-  auto debug() const -> std::string override { return "float"; }
+  auto toKoopa() const -> std::string override { return "float"; }
   auto is_float() const -> bool override { return true; }
 
   /**
@@ -111,8 +111,8 @@ public:
 
   PtrType(std::shared_ptr<Type> t) : target(t) {};
 
-  auto debug() const -> std::string override {
-    return fmt::format("*{}", target->debug());
+  auto toKoopa() const -> std::string override {
+    return fmt::format("*{}", target->toKoopa());
   }
   auto is_ptr() const -> bool override { return true; }
 
@@ -128,8 +128,8 @@ public:
 
   ArrayType(std::shared_ptr<Type> t, int _len) : base(t), len(_len) {}
 
-  auto debug() const -> std::string override {
-    return fmt::format("Array type (len : {}): {}", len, base->debug());
+  auto toKoopa() const -> std::string override {
+    return fmt::format("[{}, {}]", base->toKoopa(), len);
   }
   auto is_array() const -> bool override { return true; }
 
@@ -139,9 +139,7 @@ public:
                     std::shared_ptr<ArrayType>>
         cache;
     auto key = std::make_pair(_base, _len);
-    if (cache.contains(key)) {
-      return cache[key];
-    }
+    if (cache.contains(key)) { return cache[key]; }
     auto instance = std::make_shared<ArrayType>(_base, _len);
     return cache[key] = instance;
   }

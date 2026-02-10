@@ -22,6 +22,7 @@ using namespace detail;
 // Destructors to solve the problem of forward declaration with smart pointers
 AssignStmtAST::~AssignStmtAST() = default;
 FuncDefAST::~FuncDefAST() = default;
+ArrayDefAST::~ArrayDefAST() = default;
 
 /**
  * @brief Constructs a FuncDefAST node.
@@ -50,6 +51,11 @@ AssignStmtAST::AssignStmtAST(BaseAST *_lval, BaseAST *_expr) {
   }
 }
 
+ArrayDefAST::ArrayDefAST(bool _is_const, std::string _ident,
+                         std::vector<std::unique_ptr<ExprAST>> _array_suffix,
+                         InitValStmtAST *_init_val)
+    : is_const(_is_const), ident(std::move(_ident)),
+      array_suffix(std::move(_array_suffix)), init_val(_init_val) {}
 
 /**
  * @brief Dumps CompUnitAST node details.
@@ -85,6 +91,7 @@ auto FuncDefAST::dump(int depth) const -> void {
   }
 }
 
+// TODO: add number
 auto ArrayDefAST::dump(int depth) const -> void {
   fmt::println("{}ArrayDefAST: {}", indent(depth), ident);
 }
@@ -99,7 +106,6 @@ auto ScalarDefAST::dump(int depth) const -> void {
     initVal->dump(depth + 1);
   }
 }
-
 
 /**
  * @brief Dumps BlockAST node details.
@@ -123,6 +129,12 @@ auto ExprStmtAST::dump(int depth) const -> void {
   }
 }
 
+auto InitValStmtAST::dump(int depth) const -> void {
+  fmt::println("{}InitValStmtAST:", indent(depth));
+  for (const auto &init_val : initialize_list) {
+    init_val->dump(depth + 1);
+  }
+}
 
 /**
  * @brief Dumps ReturnStmtAST node details.
@@ -145,7 +157,6 @@ auto AssignStmtAST::dump(int depth) const -> void {
   expr->dump(depth + 1);
 }
 
-
 /**
  * @brief Dumps DeclAST node details.
  * @param depth Indentation depth.
@@ -157,7 +168,6 @@ auto DeclAST::dump(int depth) const -> void {
     def->dump(depth + 1);
   }
 }
-
 
 /**
  * @brief Dumps IfStmtAST node details.
@@ -205,7 +215,6 @@ auto BreakStmtAST::dump(int depth) const -> void {
 auto ContinueStmtAST::dump(int depth) const -> void {
   fmt::println("{}ContinueAST", indent(depth));
 }
-
 
 /**
  * @brief Dumps NumberAST node details.

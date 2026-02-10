@@ -33,7 +33,7 @@ struct Symbol {
   std::string irName;               ///< IR-level name (e.g., "@x_1")
   std::shared_ptr<type::Type> type; ///< Data type of the symbol
   SymbolKind kind;                  ///< Variable or Function
-  bool is_const;                     ///< True if it's a compile-time constant
+  bool is_const;                    ///< True if it's a compile-time constant
   int constValue; ///< The value of the constant, if applicable
 };
 
@@ -67,9 +67,7 @@ public:
    * @note Will not pop the global scope (level 0).
    */
   auto exitScope() -> void {
-    if (scopes.size() > 1u) {
-      scopes.pop_back();
-    }
+    if (scopes.size() > 1u) { scopes.pop_back(); }
   }
 
   /**
@@ -94,8 +92,8 @@ public:
    * @param val     Initial value if constant.
    */
   auto define(const std::string &name, const std::string &irName,
-              std::shared_ptr<type::Type> type, SymbolKind kind,
-              bool is_const, int val = 0) -> void {
+              std::shared_ptr<type::Type> type, SymbolKind kind, bool is_const,
+              int val = 0) -> void {
 
     if (scopes.back().contains(name)) {
       Log::panic("Semantic Error: Redefinition of " + name);
@@ -127,11 +125,9 @@ public:
    * @return Symbol* Pointer to the symbol if found, else nullptr.
    */
   auto lookup(const std::string &name) -> Symbol * {
-    for (auto &scope : std::views::reverse(scopes)) {
+    for (auto &scope : scopes | std::views::reverse) {
       auto it = scope.find(name);
-      if (it != scope.end()) {
-        return &(it->second);
-      }
+      if (it != scope.end()) { return &(it->second); }
     }
     return nullptr;
   }

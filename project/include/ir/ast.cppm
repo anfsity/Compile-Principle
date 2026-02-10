@@ -15,6 +15,7 @@ export module ir.ast;
 
 import symbol_table;
 import ir_builder;
+import ir.type;
 
 /**
  * @brief Namespace containing all AST related classes and functions.
@@ -59,6 +60,7 @@ public:
 
 class LValAST;
 class BlockAST;
+class InitValStmtAST;
 
 //* enum class
 // clang-format off
@@ -98,17 +100,21 @@ public:
   std::string btype;
   std::string ident;
   bool is_const;
+  bool is_ptr;
+  std::vector<std::unique_ptr<ExprAST>> indices;
   /**
    * @brief Constructs a function parameter.
    * @param _btype The type of the parameter (e.g., "int").
    * @param _ident The name of the parameter.
    * @param _is_const Whether the parameter is constant.
    */
-  FuncParamAST(std::string _btype, std::string _ident, bool _is_const)
-      : btype(std::move(_btype)), ident(std::move(_ident)),
-        is_const(_is_const) {}
+  FuncParamAST(std::string _btype, std::string _ident, bool _is_const,
+               bool _is_ptr, std::vector<std::unique_ptr<ExprAST>> _indices)
+      : btype(std::move(_btype)), ident(std::move(_ident)), is_const(_is_const),
+        is_ptr(_is_ptr), indices(std::move(_indices)) {}
   auto dump(int depth) const -> void override;
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
+  auto toKoopa(ir::KoopaBuilder &builder) const -> std::string;
 };
 
 class DefAST : public BaseAST {};
@@ -139,16 +145,14 @@ public:
 
 class ArrayDefAST : public DefAST {
 public:
+  ~ArrayDefAST() override;
   bool is_const;
   std::string ident;
-  std::unique_ptr<ExprAST> expr;
-  std::vector<std::unique_ptr<ExprAST>> initialize_list;
-  ArrayDefAST(bool _is_const, std::string _ident, BaseAST *_expr,
-              std::vector<std::unique_ptr<ExprAST>> _initialize_list)
-      : is_const(_is_const), ident(std::move(_ident)),
-        initialize_list(std::move(_initialize_list)) {
-    expr.reset(static_cast<ExprAST *>(_expr));
-  }
+  std::vector<std::unique_ptr<ExprAST>> array_suffix;
+  std::unique_ptr<InitValStmtAST> init_val;
+  ArrayDefAST(bool _is_const, std::string _ident,
+              std::vector<std::unique_ptr<ExprAST>> _array_suffix,
+              InitValStmtAST *_init_val);
   auto dump(int depth) const -> void override;
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };
@@ -169,9 +173,7 @@ public:
    */
   ScalarDefAST(bool _is_const, std::string _ident, BaseAST *_initVal)
       : is_const(_is_const), ident(std::move(_ident)) {
-    if (_initVal) {
-      initVal.reset(static_cast<ExprAST *>(_initVal));
-    }
+    if (_initVal) { initVal.reset(static_cast<ExprAST *>(_initVal)); }
   }
   auto dump(int depth) const -> void override;
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
@@ -217,12 +219,42 @@ public:
    * @param _expr The expression to evaluate.
    */
   ExprStmtAST(BaseAST *_expr) {
-    if (_expr) {
-      expr.reset(static_cast<ExprAST *>(_expr));
-    }
+    if (_expr) { expr.reset(static_cast<ExprAST *>(_expr)); }
   }
   auto dump(int depth) const -> void override;
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
+};
+
+/**
+ * @brief Represents an initialization value statement in the abstract syntax
+ * tree.
+ *
+ * This class is used to model initialization values, which can be either a
+ * single expression or a list of nested initializers (e.g., for arrays or
+ * aggregate types).
+ */
+class InitValStmtAST : public StmtAST {
+public:
+  std::unique_ptr<ExprAST> expr;
+  std::vector<std::unique_ptr<InitValStmtAST>> initialize_list;
+  /**
+   * @brief Constructs an InitValStmtAST object.
+   *
+   * @param _expr Pointer to a BaseAST that will be statically cast to ExprAST.
+   * It represents the primary initialization expression.
+   * @param _initialize_list Vector of unique pointers to InitValStmtAST for
+   * nested initialization. This list is moved into the member to avoid copying.
+   */
+  InitValStmtAST(BaseAST *_expr,
+                 std::vector<std::unique_ptr<InitValStmtAST>> _initialize_list)
+      : initialize_list(std::move(_initialize_list)) {
+    expr.reset(static_cast<ExprAST *>(_expr));
+  }
+
+  auto dump(int depth) const -> void override;
+  auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
+  auto flatten(std::shared_ptr<type::Type>, ir::KoopaBuilder &) const
+      -> std::vector<std::string>;
 };
 /** @} */
 
@@ -280,9 +312,7 @@ public:
    * @param _expr The return value expression (optional).
    */
   ReturnStmtAST(BaseAST *_expr) {
-    if (_expr) {
-      expr.reset(static_cast<ExprAST *>(_expr));
-    }
+    if (_expr) { expr.reset(static_cast<ExprAST *>(_expr)); }
   }
   auto dump(int depth) const -> void override;
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
@@ -363,14 +393,13 @@ public:
 class LValAST : public ExprAST {
 public:
   std::string ident;
-  std::unique_ptr<ExprAST> index;
+  std::vector<std::unique_ptr<ExprAST>> indices;
   /**
    * @brief Constructs an LVal node.
    * @param _ident The variable name.
    */
-  LValAST(std::string _ident, BaseAST *_index) : ident(std::move(_ident)) {
-    index.reset(static_cast<ExprAST *>(_index));
-  };
+  LValAST(std::string _ident, std::vector<std::unique_ptr<ExprAST>> _indices)
+      : ident(std::move(_ident)), indices(std::move(_indices)) {};
   auto dump(int depth) const -> void override;
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
   auto CalcValue(ir::KoopaBuilder &builder) const -> int override;
@@ -406,9 +435,7 @@ public:
    * @param _rhs The operand expression.
    */
   UnaryExprAST(UnaryOp _op, BaseAST *_rhs) : op(_op) {
-    if (_rhs) {
-      rhs.reset(static_cast<ExprAST *>(_rhs));
-    }
+    if (_rhs) { rhs.reset(static_cast<ExprAST *>(_rhs)); }
   }
 
   auto dump(int depth) const -> void override;
@@ -429,12 +456,8 @@ public:
    * @param _rhs The right operand.
    */
   BinaryExprAST(BinaryOp _op, BaseAST *_lhs, BaseAST *_rhs) : op(_op) {
-    if (_lhs) {
-      lhs.reset(static_cast<ExprAST *>(_lhs));
-    }
-    if (_rhs) {
-      rhs.reset(static_cast<ExprAST *>(_rhs));
-    }
+    if (_lhs) { lhs.reset(static_cast<ExprAST *>(_lhs)); }
+    if (_rhs) { rhs.reset(static_cast<ExprAST *>(_rhs)); }
   }
 
   auto dump(int depth) const -> void override;
