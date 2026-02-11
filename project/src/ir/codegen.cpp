@@ -54,7 +54,9 @@ using namespace std::views;
 auto CompUnitAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   for (const auto &child : children) {
     child->codeGen(builder);
-    if (&child != &children.back()) { builder.append("\n"); }
+    if (&child != &children.back()) {
+      builder.append("\n");
+    }
   }
   return "";
 }
@@ -138,7 +140,9 @@ auto FuncDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     //     fmt::format("@{}: {}", param->ident, btype2irType(param->btype)));
     builder.append(
         fmt::format("@{}: {}", param->ident, param->toKoopa(builder)));
-    if (&param != &params.back()) { builder.append(", "); }
+    if (&param != &params.back()) {
+      builder.append(", ");
+    }
   }
 
   if (btype == "void") {
@@ -151,7 +155,9 @@ auto FuncDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
                                   SymbolKind::Func, false);
   }
 
-  if (!block) { return ""; }
+  if (!block) {
+    return "";
+  }
 
   // enterScope mechanism: creates a new symbol table level for local variables
   // and parameters.
@@ -221,7 +227,9 @@ auto ArrayDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
           std::string res = "{";
 
           for (int i : iota(0, arr_type->len)) {
-            if (i > 0) { res += ", "; }
+            if (i > 0) {
+              res += ", ";
+            }
             res += self(arr_type->base);
           }
 
@@ -307,7 +315,9 @@ auto ScalarDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     // const btype var = value
     if (is_const) {
       int val = 0;
-      if (initVal) { val = initVal->CalcValue(builder); }
+      if (initVal) {
+        val = initVal->CalcValue(builder);
+      }
       builder.symtab().define(ident, "", type::IntType::get(), SymbolKind::Var,
                               true, val);
     } else {
@@ -336,9 +346,13 @@ auto ScalarDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
  * @return An empty string.
  */
 auto BlockAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
-  if (this->createScope) { builder.enterScope(); }
+  if (this->createScope) {
+    builder.enterScope();
+  }
   for (const auto &item : items) {
-    if (builder.isBlockClose()) { continue; }
+    if (builder.isBlockClose()) {
+      continue;
+    }
     item->codeGen(builder);
   }
   if (this->createScope) {
@@ -359,7 +373,9 @@ auto BlockAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
  * @return An empty string.
  */
 auto ExprStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
-  if (expr) { expr->codeGen(builder); }
+  if (expr) {
+    expr->codeGen(builder);
+  }
   return "";
 }
 
@@ -418,7 +434,9 @@ auto InitValStmtAST::flatten(std::shared_ptr<type::Type> targetType,
     if (type->is_int()) {
       // If no more data is provided, SysY requires implicit
       // zero-initialization.
-      if (idx >= ssize(list)) { return {"0"}; }
+      if (idx >= ssize(list)) {
+        return {"0"};
+      }
 
       const auto &node = list[idx];
       // Semantic Check: A scalar target cannot be initialized by a brace list.
@@ -590,7 +608,9 @@ auto DeclAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
  */
 auto ReturnStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   std::string ret_val;
-  if (expr) { ret_val = expr->codeGen(builder); }
+  if (expr) {
+    ret_val = expr->codeGen(builder);
+  }
 
   builder.setBlockClose();
   builder.append(fmt::format("  ret {}\n", ret_val));
@@ -741,7 +761,9 @@ auto NumberAST::codeGen([[maybe_unused]] ir::KoopaBuilder &builder) const
 
 auto LValAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   auto sym = builder.symtab().lookup(ident);
-  if (!sym) { Log::panic(fmt::format("Undefined variable: '{}'", ident)); }
+  if (!sym) {
+    Log::panic(fmt::format("Undefined variable: '{}'", ident));
+  }
 
   //* we can calculate const value in compile time
   if (sym->is_const && indices.empty() && sym->type->is_int()) {
@@ -785,7 +807,9 @@ auto LValAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     return res_val;
   }
 
-  if (is_bare_ptr_param) { return cur_ptr; }
+  if (is_bare_ptr_param) {
+    return cur_ptr;
+  }
 
   std::string decay_ptr = builder.newReg();
   builder.append(fmt::format("  {} = getelemptr {}, 0\n", decay_ptr, cur_ptr));
@@ -803,7 +827,9 @@ auto LValAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
  */
 auto FuncCallAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   auto sym = builder.symtab().lookup(ident);
-  if (!sym) { Log::panic(fmt::format("Undefined function '{}'", ident)); }
+  if (!sym) {
+    Log::panic(fmt::format("Undefined function '{}'", ident));
+  }
 
   std::vector<std::string> arg_val;
   for (const auto &arg : args) {
@@ -820,7 +846,9 @@ auto FuncCallAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 
   for (const auto &val : arg_val) {
     builder.append(val);
-    if (&val != &arg_val.back()) { builder.append(", "); }
+    if (&val != &arg_val.back()) {
+      builder.append(", ");
+    }
   }
   builder.append(")\n");
 

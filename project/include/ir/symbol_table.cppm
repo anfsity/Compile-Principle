@@ -67,7 +67,9 @@ public:
    * @note Will not pop the global scope (level 0).
    */
   auto exitScope() -> void {
-    if (scopes.size() > 1u) { scopes.pop_back(); }
+    if (scopes.size() > 1u) {
+      scopes.pop_back();
+    }
   }
 
   /**
@@ -127,7 +129,9 @@ public:
   auto lookup(const std::string &name) -> Symbol * {
     for (auto &scope : scopes | std::views::reverse) {
       auto it = scope.find(name);
-      if (it != scope.end()) { return &(it->second); }
+      if (it != scope.end()) {
+        return &(it->second);
+      }
     }
     return nullptr;
   }

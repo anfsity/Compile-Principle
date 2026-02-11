@@ -139,7 +139,9 @@ public:
                     std::shared_ptr<ArrayType>>
         cache;
     auto key = std::make_pair(_base, _len);
-    if (cache.contains(key)) { return cache[key]; }
+    if (cache.contains(key)) {
+      return cache[key];
+    }
     auto instance = std::make_shared<ArrayType>(_base, _len);
     return cache[key] = instance;
   }

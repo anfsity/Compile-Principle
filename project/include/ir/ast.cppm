@@ -173,7 +173,9 @@ public:
    */
   ScalarDefAST(bool _is_const, std::string _ident, BaseAST *_initVal)
       : is_const(_is_const), ident(std::move(_ident)) {
-    if (_initVal) { initVal.reset(static_cast<ExprAST *>(_initVal)); }
+    if (_initVal) {
+      initVal.reset(static_cast<ExprAST *>(_initVal));
+    }
   }
   auto dump(int depth) const -> void override;
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
@@ -219,7 +221,9 @@ public:
    * @param _expr The expression to evaluate.
    */
   ExprStmtAST(BaseAST *_expr) {
-    if (_expr) { expr.reset(static_cast<ExprAST *>(_expr)); }
+    if (_expr) {
+      expr.reset(static_cast<ExprAST *>(_expr));
+    }
   }
   auto dump(int depth) const -> void override;
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
@@ -312,7 +316,9 @@ public:
    * @param _expr The return value expression (optional).
    */
   ReturnStmtAST(BaseAST *_expr) {
-    if (_expr) { expr.reset(static_cast<ExprAST *>(_expr)); }
+    if (_expr) {
+      expr.reset(static_cast<ExprAST *>(_expr));
+    }
   }
   auto dump(int depth) const -> void override;
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
@@ -435,7 +441,9 @@ public:
    * @param _rhs The operand expression.
    */
   UnaryExprAST(UnaryOp _op, BaseAST *_rhs) : op(_op) {
-    if (_rhs) { rhs.reset(static_cast<ExprAST *>(_rhs)); }
+    if (_rhs) {
+      rhs.reset(static_cast<ExprAST *>(_rhs));
+    }
   }
 
   auto dump(int depth) const -> void override;
@@ -456,8 +464,12 @@ public:
    * @param _rhs The right operand.
    */
   BinaryExprAST(BinaryOp _op, BaseAST *_lhs, BaseAST *_rhs) : op(_op) {
-    if (_lhs) { lhs.reset(static_cast<ExprAST *>(_lhs)); }
-    if (_rhs) { rhs.reset(static_cast<ExprAST *>(_rhs)); }
+    if (_lhs) {
+      lhs.reset(static_cast<ExprAST *>(_lhs));
+    }
+    if (_rhs) {
+      rhs.reset(static_cast<ExprAST *>(_rhs));
+    }
   }
 
   auto dump(int depth) const -> void override;

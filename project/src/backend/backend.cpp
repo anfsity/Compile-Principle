@@ -158,8 +158,7 @@ auto TargetCodeGen::visit(const koopa_raw_program_t &program) -> void {
  * @param func The Koopa function to process.
  */
 auto TargetCodeGen::visit(koopa_raw_function_t func) -> void {
-  if (func->bbs.len == 0)
-    return;
+  if (func->bbs.len == 0) return;
 
   reset();
 
