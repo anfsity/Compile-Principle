@@ -16,7 +16,9 @@
         "ms-vscode.cmake-tools",
         "twxs.cmake",
         "daohong-emilio.yash",
-        "mikawi.flex-language"
+        "mikawi.flex-language",
+        "aaron-bond.better-comments",
+        "eamodio.gitlens"
       ],
       "settings": {
         "clangd.path": "/usr/bin/clangd-21",
