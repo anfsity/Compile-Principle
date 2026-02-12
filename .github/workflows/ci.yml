@@ -23,8 +23,8 @@ jobs:
       
       - name: Install Ninja
         run: |
-          wget https://github.com/ninja-build/ninja/releases/latest/download/ninja-linux.zip
-          unzip ninja-linux.zip -d /usr/local/bin/
+          apt-get update && apt-get install -y python3-pip
+          pip3 install ninja
           
       - name: Build Binary
         run: make
