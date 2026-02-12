@@ -1,14 +1,11 @@
 {
   "name": "SysY Compiler Dev",
   "image": "maxxing/compiler-dev",
-
   "workspaceMount": "source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind",
   "workspaceFolder": "${localWorkspaceFolder}",
-
   "mounts": [
     "source=${localEnv:HOME}/.ssh,target=/home/ubuntu/.ssh,type=bind,consistency=cached"
   ],
-
   "customizations": {
     "vscode": {
       "extensions": [
@@ -37,9 +34,7 @@
       }
     }
   },
-
   "remoteUser": "ubuntu",
-
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": {
       "username": "ubuntu",
@@ -48,9 +43,8 @@
       "configureZshAsDefaultShell": true
     }
   },
-
-  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y clangd-21",
-
+  // "postCreateCommand": "sudo apt-get update && sudo apt-get install -y clangd-21",
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y clangd-21 python3-pip && sudo pip3 install ninja --break-system-packages",
   "runArgs": [
     "--network=host",
     "--cap-add=SYS_PTRACE",
