@@ -26,6 +26,9 @@ module;
 
 #include <cassert>
 #include <fmt/core.h>
+#include <map>
+#include <memory>
+#include <ranges>
 #include <string>
 #include <vector>
 
@@ -37,6 +40,7 @@ import log;
 
 using namespace ast;
 using namespace detail;
+using namespace std::views;
 
 /**
  * @brief Generates IR for a compilation unit (the top-level node).
@@ -71,17 +75,46 @@ auto FuncParamAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   if (btype == "void") {
     Log::panic("Semantic Error: Variable cannot be of type 'void'");
   }
-  if (is_const) {
-    builder.symtab().define(ident, "", type::IntType::get(), SymbolKind::Var,
-                            true, 0);
+
+  std::shared_ptr<type::Type> param_type;
+  if (is_ptr) {
+    std::shared_ptr<type::Type> base_type = type::IntType::get();
+    for (const auto &dim :
+         indices | reverse | filter([](auto &p) { return p != nullptr; })) {
+      base_type = type::ArrayType::get(base_type, dim->CalcValue(builder));
+    }
+    param_type = type::PtrType::get(base_type);
   } else {
-    std::string addr = builder.newReg();
-    builder.append(fmt::format("  {} = alloc i32\n", addr));
-    builder.symtab().define(ident, addr, type::IntType::get(), SymbolKind::Var,
-                            false);
-    builder.append(fmt::format("  store @{}, {}\n", ident, addr));
+    param_type = type::IntType::get();
   }
+
+  std::string addr = builder.newReg();
+  builder.append(fmt::format("  {} = alloc {}\n", addr, param_type->toKoopa()));
+  builder.append(fmt::format("  store @{}, {}\n", ident, addr));
+
+  builder.symtab().define(ident, addr, param_type, SymbolKind::Var, is_const);
   return "";
+}
+
+/**
+ * @brief Converts function parameter type to Koopa IR string.
+ * @return The Koopa type string (e.g., `i32` or `*i32`).
+ */
+auto FuncParamAST::toKoopa(ir::KoopaBuilder &builder) const -> std::string {
+  std::shared_ptr<type::Type> param_type;
+
+  if (is_ptr) {
+    std::shared_ptr<type::Type> base_type = type::IntType::get();
+    for (const auto &dim :
+         indices | reverse | filter([](auto &p) { return p != nullptr; })) {
+      base_type = type::ArrayType::get(base_type, dim->CalcValue(builder));
+    }
+    param_type = type::PtrType::get(base_type);
+  } else {
+    param_type = type::IntType::get();
+  }
+
+  return param_type->toKoopa();
 }
 
 /**
@@ -100,15 +133,17 @@ auto FuncParamAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
  */
 auto FuncDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   builder.resetCount();
-  auto btype2irType = [](std::string_view s) -> std::string {
-    return (s == "int" ? "i32" : "");
-  };
+  // auto btype2irType = [](std::string_view s) -> std::string {
+  //   return (s == "int" ? "i32" : "");
+  // };
   builder.append(fmt::format("{} @", (block ? "fun" : "decl")));
   builder.append(ident);
   builder.append("(");
   for (const auto &param : params) {
+    // builder.append(
+    //     fmt::format("@{}: {}", param->ident, btype2irType(param->btype)));
     builder.append(
-        fmt::format("@{}: {}", param->ident, btype2irType(param->btype)));
+        fmt::format("@{}: {}", param->ident, param->toKoopa(builder)));
     if (&param != &params.back()) {
       builder.append(", ");
     }
@@ -119,7 +154,7 @@ auto FuncDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     builder.symtab().defineGlobal(ident, "", type::VoidType::get(),
                                   SymbolKind::Func, false);
   } else {
-    builder.append(fmt::format("): {} ", btype2irType(btype)));
+    builder.append("): i32 ");
     builder.symtab().defineGlobal(ident, "", type::IntType::get(),
                                   SymbolKind::Func, false);
   }
@@ -160,22 +195,124 @@ auto FuncDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 }
 
 /**
+ * @brief Generates IR for an array definition (global or local).
+ *
+ * Handles:
+ * 1. Type Construction: Recursively builds the multidimensional array type.
+ * 2. IR String Generation: Format string for the array type (e.g., `[[i32, 2], 3]`).
+ * 3. Allocation:
+ *    - Global: Allocates in `.data` section, handles initialization.
+ *    - Local: Allocates on stack, handles initialization via `getelemptr` and `store`.
+ * 4. Initialization: Flattens the initializer list and fills the array.
+ *
+ * @param builder The IR builder context.
+ * @return An empty string.
+ */
+auto ArrayDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
+  std::shared_ptr<type::Type> arr_type = type::IntType::get();
+  for (const auto &dim : array_suffix | reverse) {
+    arr_type = type::ArrayType::get(arr_type, dim->CalcValue(builder));
+  }
+
+  auto ir_array_suffix = [&](this auto &&self, int idx) -> std::string {
+    if (idx == ssize(array_suffix) - 1) {
+      return fmt::format("[i32, {}]", array_suffix[idx]->CalcValue(builder));
+    }
+    return fmt::format("[{}, {}]", self(idx + 1),
+                       array_suffix[idx]->CalcValue(builder));
+  }(0);
+
+  Log::trace(ir_array_suffix);
+
+  if (builder.symtab().isGlobalScope()) {
+    //! [Caution] : Since global variables do not have naming conflicts, we
+    //! will consistently use ident without the prefix.
+    //! So this avoids naming conflicts between global and local arrays.
+    std::string ir_name = builder.newVar(ident);
+    if (init_val == nullptr) {
+      builder.append(fmt::format("global {} = alloc {}, zeroinit\n", ir_name,
+                                 ir_array_suffix));
+    } else {
+      builder.append(
+          fmt::format("global {} = alloc {}, ", ir_name, ir_array_suffix));
+      auto flatten_initialize_list = init_val->flatten(arr_type, builder);
+
+      int idx = 0;
+      auto result = [&](this auto &&self,
+                        std::shared_ptr<type::Type> type) -> std::string {
+        auto arr_type = std::dynamic_pointer_cast<type::ArrayType>(type);
+        if (arr_type) {
+          std::string res = "{";
+
+          for (int i : iota(0, arr_type->len)) {
+            if (i > 0) {
+              res += ", ";
+            }
+            res += self(arr_type->base);
+          }
+
+          return res + "}";
+        }
+        return flatten_initialize_list[idx++];
+      }(arr_type);
+
+      builder.append(result + "\n");
+    }
+
+    builder.symtab().defineGlobal(ident, ir_name, arr_type, SymbolKind::Var,
+                                  is_const);
+  } else {
+    auto addr = builder.newVar(ident);
+    // builder.append(fmt::format("[debug]: {}\n", ir_array_suffix));
+    builder.append(fmt::format("  {} = alloc {}\n", addr, ir_array_suffix));
+
+    //! If a local variable has no initial value, its content is undefined
+    if (init_val != nullptr) {
+      auto flatten_initialize_list = init_val->flatten(arr_type, builder);
+
+      int idx = 0;
+      [&](this auto &&self, std::shared_ptr<type::Type> type,
+          std::string ptr) -> void {
+        if (auto arr_type = std::dynamic_pointer_cast<type::ArrayType>(type)) {
+          for (int i : iota(0, arr_type->len)) {
+            auto nxt_ptr = builder.newReg();
+            builder.append(
+                fmt::format("  {} = getelemptr {}, {}\n", nxt_ptr, ptr, i));
+            self(arr_type->base, nxt_ptr);
+          }
+          return;
+        }
+
+        auto value = flatten_initialize_list[idx++];
+        builder.append(fmt::format("  store {}, {}\n", value, ptr));
+      }(arr_type, addr);
+    }
+    builder.symtab().define(ident, addr, arr_type, SymbolKind::Var, is_const);
+  }
+
+  return "";
+}
+
+/**
  * @brief Generates IR for a single variable definition (Def).
  *
  * Handles both global and local variables:
  * - Globals: Allocated in the global space, possibly with an initializer.
  * - Locals: Allocated on the stack using 'alloc'. Constants are tracked in the
  *   symbol table but don't result in 'alloc' instructions unless they are
- * non-const.
+ *   non-const.
  *
  * @param builder The IR builder context.
  * @return An empty string.
  */
-auto DefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
+auto ScalarDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   if (builder.symtab().isGlobalScope()) {
     int val = 0;
     bool has_init = false;
     if (initVal) {
+      // NOTE: No need to check `initval` here, because `const int a;` and
+      // similar statements are not implemented and will result in an error at
+      // the syntax parsing stage.
       val = initVal->CalcValue(builder);
       has_init = true;
     }
@@ -215,7 +352,6 @@ auto DefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   }
   return "";
 }
-
 
 /**
  * @brief Generates IR for a block of statements (enclosed in { }).
@@ -262,6 +398,152 @@ auto ExprStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 }
 
 /**
+ * @brief Dummy code generation method for initializer lists.
+ *
+ * Helper node `InitValStmtAST` is only used during initialization flattening.
+ * Calling this method is a logical error.
+ */
+auto InitValStmtAST::codeGen([[maybe_unused]] ir::KoopaBuilder &builder) const
+    -> std::string {
+  //! No node should call `InitValStmtAST`'s `codeGen` function, as it is only
+  //! responsible for expanding the initialize list, not for generating code.
+  Log::panic("InitValStmtAST::codeGen was called unexpectedly. This node is "
+             "only used to expand initializer lists and must not generate "
+             "IR directly.");
+  return "";
+}
+
+/**
+ * @brief Flattens a nested SysY initializer list into a linear vector of IR
+ * values.
+ *
+ * Origin: This mechanism handles the complex C-style array initialization
+ * rules, where braces {} force alignment and scalars (numbers) flow into
+ * available slots.
+ *
+ * Mechanism:
+ * 1. Flow Mode: Scalars fill the next available i32 slots across dimension
+ * boundaries.
+ * 2. Align Mode: Braces force the "cursor" to align with the start of the next
+ * sub-type.
+ *
+ * @param targetType The expected Type (Int or Array) for the current level.
+ * @param builder The IR builder used to generate code for expressions.
+ * @return std::vector<std::string> A flat list of IR constants or register
+ * names.
+ */
+auto InitValStmtAST::flatten(std::shared_ptr<type::Type> targetType,
+                             ir::KoopaBuilder &builder) const
+    -> std::vector<std::string> {
+
+  // Helper to cast Type to ArrayType
+  static auto make_arrType = [](std::shared_ptr<type::Type> t) {
+    return std::dynamic_pointer_cast<type::ArrayType>(t);
+  };
+
+  // 'idx' tracks the current position in the initializer list at the top level.
+  int idx = 0;
+
+  /**
+   * @brief Recursive lambda to process the hierarchy of types and initializers.
+   * @param flatten_impl Self-reference for recursion.
+   * @param type The type we are currently trying to fill.
+   * @param list The current list of InitVal nodes we are consuming.
+   * @param idx Reference to the cursor in the current list.
+   */
+  auto result = [&](this auto &&flatten_impl, std::shared_ptr<type::Type> type,
+                    const std::vector<std::unique_ptr<InitValStmtAST>> &list,
+                    int &idx) -> std::vector<std::string> {
+    // Base Case: Target is a simple Integer
+    if (type->is_int()) {
+      // If no more data is provided, SysY requires implicit
+      // zero-initialization.
+      if (idx >= ssize(list)) {
+        return {"0"};
+      }
+
+      const auto &node = list[idx];
+      // Semantic Check: A scalar target cannot be initialized by a brace list.
+      // e.g., int a[2] = {1, {2}}; is invalid.
+      if (!node->expr) {
+        Log::panic(fmt::format(
+            "Semantic Error: Expected scalar, but found brace list"));
+      }
+
+      // Move the cursor after consuming one scalar value.
+      idx++;
+      if (builder.symtab().isGlobalScope()) {
+        int val = node->expr->CalcValue(builder);
+        return {std::to_string(val)};
+      } else {
+        std::string reg_or_num = node->expr->codeGen(builder);
+        return {reg_or_num};
+      }
+    }
+
+    std::vector<std::string> result;
+    auto arr_type = make_arrType(type);
+
+    // Iterate through each element of the current array dimension.
+    for (int i = 0; i < arr_type->len; ++i) {
+      std::vector<std::string> tmp_res;
+
+      // Scenario 1: The input list is exhausted before the array is full.
+      if (ssize(list) <= idx) {
+        int dummy = 0;
+        static const std::vector<std::unique_ptr<InitValStmtAST>> empty;
+        // Recursively fill the remaining slots with "0".
+        tmp_res = flatten_impl(arr_type->base, empty, dummy);
+        result.insert(result.end(), tmp_res.begin(), tmp_res.end());
+        continue;
+      }
+
+      const auto &node = list[idx];
+
+      if (node->expr) {
+        // Scenario 2 [Flow Mode]: The current item is a scalar.
+        // It might fill a part of the sub-type (if the sub-type is an array).
+        // We pass the current list and the global idx down.
+        tmp_res = flatten_impl(arr_type->base, list, idx);
+      } else {
+        // Scenario 3 [Align Mode]: The current item is a brace list { ... }.
+        // This forces alignment to the sub-type boundary.
+        int sub_idx = 0;
+        // We pass the nested list and a local sub_idx (starting at 0).
+        tmp_res = flatten_impl(arr_type->base, node->initialize_list, sub_idx);
+
+        // Semantic Check: Verify that the brace list does not contain more
+        // elements than the sub-type can hold.
+        if (sub_idx < ssize(node->initialize_list)) {
+          Log::panic(fmt::format("Semantic Error: Excess elements in array "
+                                 "initializer (expected {}, got {}).",
+                                 arr_type->base->toKoopa(),
+                                 ssize(node->initialize_list)));
+        }
+
+        // After processing the entire nested list, move the outer cursor by 1.
+        idx++;
+      }
+
+      // Append the results of the sub-type filling to the current result.
+      result.insert(result.end(), std::make_move_iterator(tmp_res.begin()),
+                    std::make_move_iterator(tmp_res.end()));
+    }
+
+    return result;
+  }(targetType, this->initialize_list, idx);
+
+  // Final Semantic Check: The top-level initializer list must not have
+  // more elements than the total capacity of the array.
+  if (idx < ssize(this->initialize_list)) {
+    Log::panic(
+        fmt::format("Semantic Error: Excess elements in initializer list"));
+  }
+
+  return result;
+}
+
+/**
  * @brief Generates IR for an assignment statement.
  *
  * Evaluates the right-hand side expression and stores the result into the
@@ -271,18 +553,51 @@ auto ExprStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
  * @return An empty string.
  */
 auto AssignStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
-  std::string val_reg = expr->codeGen(builder);
   auto sym = builder.symtab().lookup(lval->ident);
   if (!sym) {
     Log::panic(
         fmt::format("Assignment to undefined variable '{}'", lval->ident));
   }
+
   //* lval(sym) = val_reg
   if (sym->is_const) {
     Log::panic(
         fmt::format("Error: Cannot assign to const variable '{}'", sym->name));
   }
-  builder.append(fmt::format("  store {}, {}\n", val_reg, sym->irName));
+
+  auto cur_type = sym->type;
+  std::string cur_ptr = sym->irName;
+
+  if (cur_type->is_ptr()) {
+    std::string loaded_ptr = builder.newReg();
+    builder.append(fmt::format("  {} = load {}\n", loaded_ptr, cur_ptr));
+    cur_ptr = loaded_ptr;
+    cur_type = std::static_pointer_cast<type::PtrType>(cur_type)->target;
+  }
+
+  for (const auto &[i, elem] : lval->indices | enumerate) {
+    std::string idx_val = elem->codeGen(builder);
+    std::string nxt_ptr = builder.newReg();
+
+    if (i == 0 && sym->type->is_ptr()) {
+      builder.append(
+          fmt::format("  {} = getptr {}, {}\n", nxt_ptr, cur_ptr, idx_val));
+    } else {
+      builder.append(
+          fmt::format("  {} = getelemptr {}, {}\n", nxt_ptr, cur_ptr, idx_val));
+    }
+    cur_ptr = nxt_ptr;
+
+    if (cur_type->is_array()) {
+      cur_type = std::static_pointer_cast<type::ArrayType>(cur_type)->base;
+    }
+  }
+
+  if (cur_type->is_int()) {
+    std::string expr_res = expr->codeGen(builder);
+    builder.append(fmt::format("  store {}, {}\n", expr_res, cur_ptr));
+  }
+
   return "";
 }
 
@@ -299,6 +614,7 @@ auto DeclAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   if (btype == "void") {
     Log::panic("Semantic Error: Variable cannot be of type 'void'");
   }
+
   for (const auto &def : defs) {
     def->codeGen(builder);
   }
@@ -319,6 +635,7 @@ auto ReturnStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   if (expr) {
     ret_val = expr->codeGen(builder);
   }
+
   builder.setBlockClose();
   builder.append(fmt::format("  ret {}\n", ret_val));
   return "";
@@ -342,6 +659,7 @@ auto IfStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   std::string else_label = builder.newLabel("else", id);
   std::string end_label  = builder.newLabel("end",  id);
   // clang-format on
+
   if (elseS) {
     builder.append(
         fmt::format("  br {}, {}, {}\n", cond_reg, then_label, else_label));
@@ -367,6 +685,7 @@ auto IfStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
       builder.append(fmt::format("  jump {}\n", end_label));
     }
   }
+
   builder.append(fmt::format("{}:\n", end_label));
   // every basic block (entry) need to pair a block close.
   builder.clearBlockClose();
@@ -441,7 +760,6 @@ auto ContinueStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   return "";
 }
 
-
 /**
  * @brief Generates IR for a literal number.
  *
@@ -464,18 +782,62 @@ auto NumberAST::codeGen([[maybe_unused]] ir::KoopaBuilder &builder) const
  * @param builder The IR builder context.
  * @return The register name or constant value.
  */
+
 auto LValAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   auto sym = builder.symtab().lookup(ident);
   if (!sym) {
     Log::panic(fmt::format("Undefined variable: '{}'", ident));
   }
+
   //* we can calculate const value in compile time
-  if (sym->is_const) {
+  if (sym->is_const && indices.empty() && sym->type->is_int()) {
     return std::to_string(sym->constValue);
   }
-  std::string reg = builder.newReg();
-  builder.append(fmt::format("  {} = load {}\n", reg, sym->irName));
-  return reg;
+
+  std::string cur_ptr = sym->irName;
+  auto cur_type = sym->type;
+
+  if (cur_type->is_ptr()) {
+    std::string loaded_ptr = builder.newReg();
+    builder.append(fmt::format("  {} = load {}\n", loaded_ptr, cur_ptr));
+    cur_ptr = loaded_ptr;
+    cur_type = std::static_pointer_cast<type::PtrType>(cur_type)->target;
+  }
+
+  for (const auto &[i, elem] : indices | enumerate) {
+    std::string idx_val = elem->codeGen(builder);
+    std::string nxt_ptr = builder.newReg();
+
+    if (i == 0 && sym->type->is_ptr()) {
+      builder.append(
+          fmt::format("  {} = getptr {}, {}\n", nxt_ptr, cur_ptr, idx_val));
+    } else {
+      builder.append(
+          fmt::format("  {} = getelemptr {}, {}\n", nxt_ptr, cur_ptr, idx_val));
+
+      if (cur_type->is_array()) {
+        cur_type = std::static_pointer_cast<type::ArrayType>(cur_type)->base;
+      }
+    }
+
+    cur_ptr = nxt_ptr;
+  }
+
+  bool is_bare_ptr_param = sym->type->is_ptr() && indices.empty();
+
+  if (cur_type->is_int() && !is_bare_ptr_param) {
+    std::string res_val = builder.newReg();
+    builder.append(fmt::format("  {} = load {}\n", res_val, cur_ptr));
+    return res_val;
+  }
+
+  if (is_bare_ptr_param) {
+    return cur_ptr;
+  }
+
+  std::string decay_ptr = builder.newReg();
+  builder.append(fmt::format("  {} = getelemptr {}, 0\n", decay_ptr, cur_ptr));
+  return decay_ptr;
 }
 
 /**
@@ -497,6 +859,7 @@ auto FuncCallAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   for (const auto &arg : args) {
     arg_val.emplace_back(arg->codeGen(builder));
   }
+
   std::string ret_reg;
   if (sym->type->is_void()) {
     builder.append(fmt::format("  call @{}(", ident));
@@ -504,6 +867,7 @@ auto FuncCallAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     ret_reg = builder.newReg();
     builder.append(fmt::format("  {} = call @{}(", ret_reg, ident));
   }
+
   for (const auto &val : arg_val) {
     builder.append(val);
     if (&val != &arg_val.back()) {
@@ -511,6 +875,7 @@ auto FuncCallAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     }
   }
   builder.append(")\n");
+
   return ret_reg;
 }
 
@@ -525,6 +890,7 @@ auto FuncCallAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 auto UnaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   std::string rhs_reg = rhs->codeGen(builder);
   std::string ret_reg = builder.newReg();
+
   switch (op) {
   case UnaryOp::Neg:
     builder.append(fmt::format("  {} = sub 0, {}\n", ret_reg, rhs_reg));
@@ -534,6 +900,7 @@ auto UnaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     break;
   default: Log::panic("Code Gen Error: Unknown unary op");
   }
+
   return ret_reg;
 }
 
@@ -547,6 +914,7 @@ auto UnaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
  * @return The register name holding the result.
  */
 auto BinaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
+
   if (op == BinaryOp::And) {
     std::string tmp_addr = builder.newVar("and_res");
     builder.append(fmt::format("  {} = alloc i32\n", tmp_addr));
@@ -567,12 +935,12 @@ auto BinaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     std::string rhs_reg = rhs->codeGen(builder);
     std::string rhs_bool = builder.newReg();
     builder.append(fmt::format("  {} = ne {}, 0\n", rhs_bool, rhs_reg));
-    builder.append(fmt::format("   store {}, {}\n", rhs_bool, tmp_addr));
+    builder.append(fmt::format("  store {}, {}\n", rhs_bool, tmp_addr));
     builder.append(fmt::format("  jump {}\n", end_label));
 
     // false branch
     builder.append(fmt::format("{}:\n", false_label));
-    builder.append(fmt::format("   store 0, {}\n", tmp_addr));
+    builder.append(fmt::format("  store 0, {}\n", tmp_addr));
     builder.append(fmt::format("  jump {}\n", end_label));
 
     // end
@@ -582,6 +950,7 @@ auto BinaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 
     return ret_reg;
   }
+
   if (op == BinaryOp::Or) {
     std::string tmp_addr = builder.newVar("or_res");
     builder.append(fmt::format("  {} = alloc i32\n", tmp_addr));
@@ -608,7 +977,7 @@ auto BinaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     std::string rhs_reg = rhs->codeGen(builder);
     std::string rhs_bool = builder.newReg();
     builder.append(fmt::format("  {} = ne {}, 0\n", rhs_bool, rhs_reg));
-    builder.append(fmt::format("   store {}, {}\n", rhs_bool, tmp_addr));
+    builder.append(fmt::format("  store {}, {}\n", rhs_bool, tmp_addr));
     builder.append(fmt::format("  jump {}\n", end_label));
 
     // end
@@ -618,6 +987,7 @@ auto BinaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
 
     return ret_reg;
   }
+
   // remain binary operator
   std::string lhs_reg = lhs->codeGen(builder);
   std::string rhs_reg = rhs->codeGen(builder);
@@ -627,7 +997,6 @@ auto BinaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
       fmt::format("  {} = {} {}, {}\n", ret_reg, ir_op, lhs_reg, rhs_reg));
   return ret_reg;
 }
-
 
 /**
  * @brief Evaluates a literal number at compile time.
@@ -653,6 +1022,7 @@ auto LValAST::CalcValue(ir::KoopaBuilder &builder) const -> int {
     Log::panic(
         fmt::format("Undefined variable '{}' in constant expression", ident));
   }
+
   if (!sym->is_const) {
     Log::panic(fmt::format("Variable '{}' is not a constant, cannot be used in "
                            "constant expression",
@@ -701,6 +1071,7 @@ auto UnaryExprAST::CalcValue(ir::KoopaBuilder &builder) const -> int {
 auto BinaryExprAST::CalcValue(ir::KoopaBuilder &builder) const -> int {
   int rhs_val = rhs->CalcValue(builder);
   int lhs_val = lhs->CalcValue(builder);
+
   switch (op) {
   case BinaryOp::Add: return lhs_val + rhs_val;
   case BinaryOp::Sub: return lhs_val - rhs_val;

@@ -46,11 +46,13 @@ void yyerror(std::unique_ptr<BaseAST> &ast, const char *str);
   std::string *str_val;
   int int_val;
   ast::BaseAST *ast_val;
+  ast::InitValStmtAST *init_val;
   std::vector<std::unique_ptr<ast::BaseAST>> *items_val;
   std::vector<std::unique_ptr<ast::DefAST>> *defs_val;
   std::vector<std::unique_ptr<ast::BaseAST>> *children_val;
   std::vector<std::unique_ptr<ast::FuncParamAST>> *funcParams_val;
   std::vector<std::unique_ptr<ast::ExprAST>> *args_val;
+  std::vector<std::unique_ptr<ast::InitValStmtAST>> *initialize_list_val;
 }
 
 // terminal letters are written in uppercase.
@@ -64,7 +66,9 @@ void yyerror(std::unique_ptr<BaseAST> &ast, const char *str);
 %type <ast_val> ConstDef VarDef BlockItem Decl ConstDecl VarDecl
 %type <ast_val> CompUnitItem CompUnit FuncFParam
 %type <funcParams_val> FuncFParams
-%type <args_val> FuncRParams
+%type <args_val> FuncRParams ArraySuffix ParamArraySuffix
+%type <init_val> InitVal
+%type <initialize_list_val> InitializeList
 %type <children_val> CompUnitItemList
 %type <items_val> BlockItemList
 %type <defs_val> VarDefList ConstDefList
@@ -79,6 +83,14 @@ void yyerror(std::unique_ptr<BaseAST> &ast, const char *str);
 %left '+' '-'             // + -
 %left '*' '/' '%'         // * / %
 %right '!' PRIORITY       // ! -
+
+/*
+VarDef        ::= IDENT {"[" ConstExp "]"}
+                | IDENT {"[" ConstExp "]"} "=" InitVal;
+InitVal       ::= Exp | "{" [InitVal {"," InitVal}] "}";
+
+LVal          ::= IDENT {"[" Exp "]"};
+*/
 
 %%
 /**
@@ -145,16 +157,37 @@ FuncFParams
 
 FuncFParam
   : Btype IDENT {
-    $$ = new FuncParamAST(std::move(*$1), std::move(*$2), false);
+    $$ = new FuncParamAST(std::move(*$1), std::move(*$2), false, false, {});
     delete $1;
     delete $2;
   }
-  | CONST Btype IDENT {
-    $$ = new FuncParamAST(std::move(*$2), std::move(*$3), true);
+  | Btype IDENT ParamArraySuffix {
+    $$ = new FuncParamAST(std::move(*$1), std::move(*$2), false, true, std::move(*$3));
+    delete $1;
     delete $2;
     delete $3;
   }
+  | CONST Btype IDENT {
+    $$ = new FuncParamAST(std::move(*$2), std::move(*$3), true, false, {});
+    delete $2;
+    delete $3;
+  }
+  | CONST Btype IDENT ParamArraySuffix {
+    $$ = new FuncParamAST(std::move(*$2), std::move(*$3), true, true, std::move(*$4));
+    delete $2;
+    delete $3;
+    delete $4;
+  };
 
+ParamArraySuffix
+  : '[' ']' {
+    $$ = new std::vector<std::unique_ptr<ExprAST>>();
+    $$->push_back(nullptr);
+  }
+  | '[' ']' ArraySuffix {
+    $$ = $3;
+    $$->insert($$->begin(), nullptr);
+  };
 
 /**
  * @brief A block of code enclosed in curly braces.
@@ -175,15 +208,22 @@ BlockItemList
     $$->push_back(std::unique_ptr<BaseAST>($2));
   };
 
+/**
+ * @brief Block item (declaration or statement).
+ */
 BlockItem
   : Decl { $$ = $1; }
   | Stmt { $$ = $1; };
 
+/**
+ * @brief Declaration (constant or variable).
+ */
 Decl 
   : ConstDecl { $$ = $1; }
   | VarDecl   { $$ = $1; };
-
-ConstDecl
+/**
+ * @brief Constant declaration.
+ */ConstDecl
   : CONST Btype ConstDefList ';' {
     $$ = new DeclAST(true, std::move(*$2), std::move(*$3));
     delete $2;
@@ -201,12 +241,64 @@ ConstDefList
     $$->push_back(std::unique_ptr<DefAST>(static_cast<DefAST *>($3)));
   };
 
+/**
+ * @brief Constant definition.
+ */
 ConstDef 
   : IDENT '=' Expr {
-    $$ = new DefAST(true, std::move(*$1), $3);
+    // @param is_const, ident, exprAST
+    $$ = new ScalarDefAST(true, std::move(*$1), $3);
     delete $1;
+  }
+  | IDENT ArraySuffix '=' InitVal {
+    $$ = new ArrayDefAST(true, std::move(*$1), std::move(*$2), $4);
+    delete $1;
+    delete $2;
   };
 
+/**
+ * @brief Array dimension suffix (e.g. `[2][3]`).
+ */
+ArraySuffix
+  : '[' Expr ']' {
+    $$ = new std::vector<std::unique_ptr<ExprAST>>();
+    $$->push_back(std::unique_ptr<ExprAST>(static_cast<ExprAST *>($2)));
+  }
+  | ArraySuffix '[' Expr ']' {
+    $$ = $1;
+    $$->push_back(std::unique_ptr<ExprAST>(static_cast<ExprAST *>($3)));
+  };
+
+InitializeList
+  : InitVal {
+    $$ = new std::vector<std::unique_ptr<InitValStmtAST>>();
+    $$->push_back(std::unique_ptr<InitValStmtAST>($1));
+  }
+  | InitializeList ',' InitVal {
+    $$ = $1;
+    $$->push_back(std::unique_ptr<InitValStmtAST>($3));
+  };
+
+// {1, 2, {2, 0}}
+/**
+ * @brief Initializer value (expression or initializer list).
+ */
+InitVal
+  : Expr {
+    $$ = new InitValStmtAST($1, {});
+    // delete $1;
+  }
+  | '{' '}' {
+    $$ = new InitValStmtAST(nullptr, {});
+  }
+  | '{' InitializeList '}' {
+    $$ = new InitValStmtAST(nullptr, std::move(*$2));
+    delete $2;
+  };
+
+/**
+ * @brief Variable declaration.
+ */
 VarDecl
   : Btype VarDefList ';' {
     $$ = new DeclAST(false, std::move(*$1), std::move(*$2));
@@ -224,15 +316,34 @@ VarDefList
     $$->push_back(std::unique_ptr<DefAST>(static_cast<DefAST *>($3)));
   };
 
+/**
+ * @brief Variable definition (with optional initialization).
+ */
 VarDef 
   : IDENT '=' Expr {
-    $$ = new DefAST(false, std::move(*$1), $3);
+    $$ = new ScalarDefAST(false, std::move(*$1), $3);
     delete $1;
   };
   | IDENT {
-    $$ = new DefAST(false, std::move(*$1), nullptr);
+    $$ = new ScalarDefAST(false, std::move(*$1), nullptr);
     delete $1;
+  }  
+  | IDENT ArraySuffix {
+    $$ = new ArrayDefAST(false, std::move(*$1), std::move(*$2), nullptr);
+    delete $1;
+    delete $2;
+  }
+  | IDENT ArraySuffix '=' InitVal {
+    $$ = new ArrayDefAST(false, std::move(*$1), std::move(*$2), $4);
+    delete $1;
+    delete $2;
+    // delete $4;
   };
+
+/*
+VarDef        ::= IDENT ["[" ConstExp "]"]
+                | IDENT ["[" ConstExp "]"] "=" InitVal;
+*/
 
 Btype
   : INT { $$ = new std::string("int"); }
@@ -283,7 +394,7 @@ Expr
   : Number { $$ = $1; }
   | '(' Expr ')' { $$ = $2; }
   | LVal { $$ = $1; }
-  /* unary experssion */
+  /* unary expression */
   /*  function call */
   | IDENT '(' ')' {
     auto args = std::vector<std::unique_ptr<ExprAST>>();
@@ -304,7 +415,7 @@ Expr
   | '-' Expr %prec PRIORITY {
     $$ = new UnaryExprAST(UnaryOp::Neg, $2);
   }
-  /* binary experssion */
+  /* binary expression */
   | Expr '+' Expr {
     $$ = new BinaryExprAST(BinaryOp::Add, $1, $3);
   }
@@ -345,15 +456,26 @@ Expr
     $$ = new BinaryExprAST(BinaryOp::Or, $1, $3);
   };
 
+/**
+ * @brief Integer constant wrapper.
+ */
 Number
   : INT_CONST {
     $$ = new NumberAST($1);
   };
 
+/**
+ * @brief Left-value expression (variable / array access).
+ */
 LVal 
   : IDENT {
-    $$ = new LValAST(std::move(*$1));
+    $$ = new LValAST(std::move(*$1), {});
     delete $1;
+  }
+  | IDENT ArraySuffix {
+    $$ = new LValAST(std::move(*$1), std::move(*$2));
+    delete $1;
+    delete $2;
   };
 
 /**

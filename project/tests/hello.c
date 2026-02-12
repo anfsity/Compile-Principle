@@ -1,6 +1,13 @@
-int a = 10;
+int x;
 
-int inc() {
-  a = a + 1;
-  return a;
+int t() {
+  x = x + 1;
+  return 1;
+}
+
+int main() {
+  int sum = 0;
+  t();
+  putint(x);
+  return sum;
 }

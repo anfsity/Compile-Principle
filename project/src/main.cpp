@@ -111,12 +111,12 @@ auto main(int argc, const char *argv[]) -> int {
   }
 
   // 3. Generate RISC-V assembly from Koopa IR
-  backend::KoopaWrapper wrapper(ir);
-  backend::TargetCodeGen generator;
-  generator.visit(wrapper.getRaw());
-
-  const std::string asmCode = generator.getAssembly();
   if (config.mode == "-riscv") {
+    backend::KoopaWrapper wrapper(ir);
+    backend::TargetCodeGen generator;
+    generator.visit(wrapper.getRaw());
+
+    const std::string asmCode = generator.getAssembly();
     auto out = fmt::output_file(config.output_file);
     out.print("{}", asmCode);
     fmt::print(fmt::fg(fmt::color::cyan), "[Success] Parse riscv succeed!\n");

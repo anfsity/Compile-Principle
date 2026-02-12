@@ -8,7 +8,7 @@ PWD := $(shell pwd)
 all: build
 
 config:
-	cmake -S . -B $(BUILD_DIR) -G Ninja -DCMAKE_MAKE_PROGRAM=$(PWD)/ninja
+	cmake -S . -B $(BUILD_DIR) -G Ninja -DCMAKE_CXX_COMPILER=clang++
 
 build: config
 	cmake --build $(BUILD_DIR) -j12
@@ -28,7 +28,8 @@ run:
 	./cmake-build/compiler -riscv ./tests/hello.c -o ./debug/hello.asm
 
 test:
-	cd cmake-build && ctest && cd ..
+	python3 scripts/test_runner.py koopa
+	python3 scripts/test_runner.py riscv
 
 docker-build:
 	docker run --rm \

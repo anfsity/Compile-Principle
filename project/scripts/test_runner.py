@@ -37,6 +37,10 @@ def read_file(path):
     with open(path, 'r') as f:
         return f.read()
 
+def normalize(text):
+    lines = [line.rstrip() for line in text.strip().splitlines()]
+    return "\n".join(lines)
+
 def run_cmd(cmd, input_str=None):
     """运行 shell 命令并获取 stdout, stderr, returncode"""
     try:
@@ -68,7 +72,7 @@ def run_test_case(mode, src_file):
 
     # 读取输入和预期输出
     stdin_content = read_file(input_file)
-    expected_output = read_file(expect_file).strip()
+    expected_output = normalize(read_file(expect_file))
 
     print(f"Testing {name_no_ext} ... ", end='', flush=True)
 
@@ -126,7 +130,7 @@ def run_test_case(mode, src_file):
 
     # 先检查输出值是否匹配
     out, err, ret = run_cmd(cmd_run, stdin_content)
-    actual_output = out.strip()
+    actual_output = normalize(out)
     if actual_output != expected_output:
         # 检查返回值和 .out 是否匹配
         actual_with_ret = (actual_output + "\n" + str(ret)).strip()

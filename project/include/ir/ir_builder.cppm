@@ -151,8 +151,6 @@ public:
    */
   auto resetCount() -> void {
     count_reg = 0;
-    count_name = 0;
-    count_label = 0;
     _is_block_closed = false;
   }
 
