@@ -23,8 +23,8 @@ jobs:
       
       - name: Install Ninja
         run: |
-          apt-get update && apt-get install -y python3-pip
-          pip3 install ninja
+          apt-get update && apt-get install -y ninja-build
+          ninja --version
           
       - name: Build Binary
         run: make
