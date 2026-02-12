@@ -44,6 +44,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Install Ninja
+        run: |
+          apt-get update && apt-get install -y ninja-build
+          ninja --version
+
       - name: Run Test
         run: autotest -w debug -${{ matrix.test_type }} .
 
