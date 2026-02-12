@@ -911,12 +911,12 @@ auto BinaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     std::string rhs_reg = rhs->codeGen(builder);
     std::string rhs_bool = builder.newReg();
     builder.append(fmt::format("  {} = ne {}, 0\n", rhs_bool, rhs_reg));
-    builder.append(fmt::format("   store {}, {}\n", rhs_bool, tmp_addr));
+    builder.append(fmt::format("  store {}, {}\n", rhs_bool, tmp_addr));
     builder.append(fmt::format("  jump {}\n", end_label));
 
     // false branch
     builder.append(fmt::format("{}:\n", false_label));
-    builder.append(fmt::format("   store 0, {}\n", tmp_addr));
+    builder.append(fmt::format("  store 0, {}\n", tmp_addr));
     builder.append(fmt::format("  jump {}\n", end_label));
 
     // end
@@ -953,7 +953,7 @@ auto BinaryExprAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
     std::string rhs_reg = rhs->codeGen(builder);
     std::string rhs_bool = builder.newReg();
     builder.append(fmt::format("  {} = ne {}, 0\n", rhs_bool, rhs_reg));
-    builder.append(fmt::format("   store {}, {}\n", rhs_bool, tmp_addr));
+    builder.append(fmt::format("  store {}, {}\n", rhs_bool, tmp_addr));
     builder.append(fmt::format("  jump {}\n", end_label));
 
     // end

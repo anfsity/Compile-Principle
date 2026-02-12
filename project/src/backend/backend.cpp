@@ -104,6 +104,7 @@ module;
 #include "koopa.h"
 #include <cassert>
 #include <fmt/core.h>
+#include <ranges>
 #include <span>
 #include <string>
 
@@ -134,9 +135,58 @@ template <typename ptrType> auto make_span(const koopa_raw_slice_t &slice) {
   return std::span<const ptrType>(
       reinterpret_cast<const ptrType *>(slice.buffer), slice.len);
 }
+
+auto get_type_size(koopa_raw_type_t ty) -> u_int32_t {
+  switch (ty->tag) {
+
+  case KOOPA_RTT_INT32: return 4;
+  case KOOPA_RTT_POINTER: return 4;
+
+  case KOOPA_RTT_ARRAY:
+    return ty->data.array.len * get_type_size(ty->data.array.base);
+
+  default: return 0;
+  }
+}
+
+auto isIn12BitRange(int val) -> bool { return val >= -2048 && val <= 2047; }
+
+auto emitAddi(std::string &buffer, std::string_view rd, std::string_view rs,
+              int imm) -> void {
+  if (isIn12BitRange(imm)) {
+    buffer += fmt::format("  addi {}, {}, {}\n", rd, rs, imm);
+  } else {
+    buffer += fmt::format("  li t2, {}\n", imm);
+    buffer += fmt::format("  add {}, {}, t2\n", rd, rs);
+  }
+}
+
+auto emitLw(std::string &buffer, std::string_view rd, std::string_view rs,
+            int offset) -> void {
+  if (isIn12BitRange(offset)) {
+    buffer += fmt::format("  lw {}, {}({})\n", rd, offset, rs);
+  } else {
+    buffer += fmt::format("  li t2, {}\n", offset);
+    buffer += fmt::format("  add t2, t2, {}\n", rs);
+    buffer += fmt::format("  lw {}, 0(t2)\n", rd);
+  }
+}
+
+auto emitSw(std::string &buffer, std::string_view src, std::string_view base,
+            int offset) -> void {
+  if (isIn12BitRange(offset)) {
+    buffer += fmt::format("  sw {}, {}({})\n", src, offset, base);
+  } else {
+    buffer += fmt::format("  li t2, {}\n", offset);
+    buffer += fmt::format("  add t2, t2, {}\n", base);
+    buffer += fmt::format("  sw {}, 0(t2)\n", src);
+  }
+}
+
 } // namespace backend
 
 using namespace backend;
+using namespace std::views;
 
 auto TargetCodeGen::visit(const koopa_raw_program_t &program) -> void {
   for (const auto value : make_span<koopa_raw_value_t>(program.values)) {
@@ -166,20 +216,26 @@ auto TargetCodeGen::visit(koopa_raw_function_t func) -> void {
   bool has_callee = false;
   for (const auto bb : make_span<koopa_raw_basic_block_t>(func->bbs)) {
     for (const auto inst : make_span<koopa_raw_value_t>(bb->insts)) {
-      // If the instruction produces a value (not void), allocate space on
-      // stack. In this simple backend, every value-producing instruction gets
-      // its own slot.
-      if (inst->ty->tag != KOOPA_RTT_UNIT) {
-        stkMap[inst] = local_frame_size;
-        local_frame_size += 4;
-      }
       // If this function calls another, we need to save RA and potentially
       // allocate space for outgoing arguments.
       if (inst->kind.tag == KOOPA_RVT_CALL) {
         has_callee = true;
         ra_size = 4;
         // Keep track of the maximum number of arguments in any call.
-        args_size = std::max<size_t>(args_size, inst->kind.data.call.args.len);
+        args_size = std::max<int>(args_size, inst->kind.data.call.args.len);
+      }
+
+      if (inst->ty->tag == KOOPA_RTT_UNIT) continue;
+      // If the instruction produces a value (not void), allocate space on
+      // stack. In this simple backend, every value-producing instruction gets
+      // its own slot.
+      stkMap[inst] = local_frame_size;
+
+      if (inst->kind.tag == KOOPA_RVT_ALLOC) {
+        int size = get_type_size(inst->ty->data.pointer.base);
+        local_frame_size += size;
+      } else {
+        local_frame_size += 4;
       }
     }
   }
@@ -200,12 +256,12 @@ auto TargetCodeGen::visit(koopa_raw_function_t func) -> void {
   buffer += fmt::format("{}:\n", func->name + 1);
 
   if (stk_frame_size > 0) {
-    buffer += fmt::format("  addi sp, sp, -{}\n", stk_frame_size);
+    emitAddi(buffer, "sp", "sp", -stk_frame_size);
   }
 
   if (has_callee) {
     // Save RA at the top of the frame (below the caller's frame).
-    buffer += fmt::format("  sw ra, {}(sp)\n", stk_frame_size - 4);
+    emitSw(buffer, "ra", "sp", stk_frame_size - 4);
   }
 
   // Offset local variable storage by the size allocated for outgoing arguments.
@@ -214,18 +270,19 @@ auto TargetCodeGen::visit(koopa_raw_function_t func) -> void {
   }
 
   // --- Parameter Handling ---
-  for (size_t i = 0;
-       const auto param : make_span<koopa_raw_value_t>(func->params)) {
+
+  for (const auto [i, param] :
+       make_span<koopa_raw_value_t>(func->params) | enumerate) {
     if (i < 8) {
       // Store input parameters (a0-a7) into their allocated stack slots.
       int offset = stkMap[param] = i * 4 + args_size;
-      buffer += fmt::format("  sw a{}, {}(sp)\n", i, offset);
+      auto src = fmt::format("a{}", i);
+      emitSw(buffer, src, "sp", offset);
     } else {
       // Parameters passed on stack by caller are located ABOVE the current SP.
       int offset = stk_frame_size + (i - 8) * 4;
       stkMap[param] = offset;
     }
-    ++i;
   }
 
   // --- Function Body ---
@@ -238,6 +295,7 @@ auto TargetCodeGen::visit(koopa_raw_basic_block_t bb) -> void {
   if (bb->name) {
     buffer += fmt::format("{}:\n", bb->name + 1);
   }
+
   for (const auto inst : make_span<koopa_raw_value_t>(bb->insts)) {
     visit(inst);
   }
@@ -259,11 +317,6 @@ auto TargetCodeGen::visit(koopa_raw_value_t value) -> void {
     break;
   }
 
-  case KOOPA_RVT_INTEGER: {
-    visit(kind.data.integer);
-    break;
-  }
-
   case KOOPA_RVT_STORE: {
     visit(kind.data.store);
     break;
@@ -274,6 +327,7 @@ auto TargetCodeGen::visit(koopa_raw_value_t value) -> void {
     break;
   }
 
+  // br
   case KOOPA_RVT_BRANCH: {
     visit(kind.data.branch);
     break;
@@ -284,9 +338,21 @@ auto TargetCodeGen::visit(koopa_raw_value_t value) -> void {
     break;
   }
 
-  case KOOPA_RVT_FUNC_ARG_REF: {
-    // Reference to a function argument.
-    visit(kind.data.func_arg_ref);
+  case KOOPA_RVT_GET_ELEM_PTR: {
+    visit(kind.data.get_elem_ptr);
+    if (value->ty->tag != KOOPA_RTT_UNIT) {
+      int offset = stkMap[value];
+      emitSw(buffer, "t0", "sp", offset);
+    }
+    break;
+  }
+
+  case KOOPA_RVT_GET_PTR: {
+    visit(kind.data.get_ptr);
+    if (value->ty->tag != KOOPA_RTT_UNIT) {
+      int offset = stkMap[value];
+      emitSw(buffer, "t0", "sp", offset);
+    }
     break;
   }
 
@@ -294,9 +360,9 @@ auto TargetCodeGen::visit(koopa_raw_value_t value) -> void {
     visit(kind.data.call);
     // If the function returns an int, it's in a0. Save it to the stack slot
     // assigned to this 'call' value.
-    if (value->ty->tag == KOOPA_RTT_INT32) {
+    if (value->ty->tag != KOOPA_RTT_UNIT) {
       int offset = stkMap[value];
-      buffer += fmt::format("  sw a0, {}(sp)\n", offset);
+      emitSw(buffer, "a0", "sp", offset);
     }
     break;
   }
@@ -315,7 +381,7 @@ auto TargetCodeGen::visit(koopa_raw_value_t value) -> void {
     // Binary operations result in a value in t0. Save it to stack.
     if (value->ty->tag != KOOPA_RTT_UNIT) {
       int offset = stkMap[value];
-      buffer += fmt::format("  sw t0, {}(sp)\n", offset);
+      emitSw(buffer, "t0", "sp", offset);
     }
     break;
   }
@@ -325,12 +391,15 @@ auto TargetCodeGen::visit(koopa_raw_value_t value) -> void {
     // Load result is in t0. Save it to stack.
     if (value->ty->tag != KOOPA_RTT_UNIT) {
       int offset = stkMap[value];
-      buffer += fmt::format("  sw t0, {}(sp)\n", offset);
+      emitSw(buffer, "t0", "sp", offset);
     }
     break;
   }
 
-  default: assert(false);
+  default: {
+    Log::panic("Let's explore the world ahead another time~\n"
+               "(Unhandled value tag in visit value)");
+  }
   }
 }
 
@@ -349,26 +418,14 @@ auto TargetCodeGen::visit(const koopa_raw_jump_t &jump) -> void {
 auto TargetCodeGen::visit(const koopa_raw_load_t &load) -> void {
   // src is a pointer value (either a local alloc or a global).
   load_to(load.src, "t0");
-  // If it's a global, t0 now contains the address. We need to load from it.
-  if (load.src->kind.tag == KOOPA_RVT_GLOBAL_ALLOC) {
-    buffer += "  lw t0, 0(t0)\n";
-  }
-  // Note: if it was a local alloc, load_to already performed the lw t0,
-  // offset(sp) because local allocs are just pointers to stack slots.
+  buffer += "  lw t0, 0(t0)\n";
 }
 
 auto TargetCodeGen::visit(const koopa_raw_store_t &store) -> void {
-  // Store 'value' into 'dest'.
   load_to(store.value, "t0");
-  if (store.dest->kind.tag == KOOPA_RVT_GLOBAL_ALLOC) {
-    std::string name = store.dest->name + 1;
-    buffer += fmt::format("  la t1, {}\n", name);
-    buffer += "  sw t0, 0(t1)\n";
-  } else if (stkMap.contains(store.dest)) {
-    int offset = stkMap[store.dest];
-    // Store the value into the destination's stack slot.
-    buffer += fmt::format("  sw t0, {}(sp)\n", offset);
-  }
+  load_to(store.dest, "t1");
+
+  buffer += "  sw t0, 0(t1)\n";
 }
 
 /**
@@ -381,11 +438,13 @@ auto TargetCodeGen::visit(const koopa_raw_return_t &ret) -> void {
   }
   // Function Epilogue: Restore RA and SP.
   if (ra_size > 0) {
-    buffer += fmt::format("  lw ra, {}(sp)\n", stk_frame_size - ra_size);
+    emitLw(buffer, "ra", "sp", stk_frame_size - ra_size);
   }
+
   if (stk_frame_size > 0) {
-    buffer += fmt::format("  addi sp, sp, {}\n", stk_frame_size);
+    emitAddi(buffer, "sp", "sp", stk_frame_size);
   }
+
   buffer += "  ret\n";
 }
 
@@ -398,6 +457,7 @@ auto TargetCodeGen::visit(const koopa_raw_return_t &ret) -> void {
  * @param value The Koopa value to load.
  * @param reg   The target register name (e.g., "t0").
  */
+
 auto TargetCodeGen::load_to(const koopa_raw_value_t &value,
                             const std::string &reg) -> void {
   switch (value->kind.tag) {
@@ -416,20 +476,27 @@ auto TargetCodeGen::load_to(const koopa_raw_value_t &value,
     break;
   }
 
+  case KOOPA_RVT_ALLOC: {
+    int offset = stkMap[value];
+    emitAddi(buffer, reg, "sp", offset);
+    break;
+  }
+
   // Local allocations and instruction results are all stored in the stack
   // frame.
+  case KOOPA_RVT_GET_ELEM_PTR:
+  case KOOPA_RVT_GET_PTR:
   case KOOPA_RVT_CALL:
   case KOOPA_RVT_FUNC_ARG_REF:
   case KOOPA_RVT_BINARY:
-  case KOOPA_RVT_LOAD:
-  case KOOPA_RVT_ALLOC: {
+  case KOOPA_RVT_LOAD: {
     int offset = stkMap[value];
-    buffer += fmt::format("  lw {}, {}(sp)\n", reg, offset);
+    emitLw(buffer, reg, "sp", offset);
     break;
   }
 
   default: {
-    buffer += "Wait! Do you realy think you arguments should go here ?\n";
+    Log::panic("Unhandled value tag in load_to");
     break;
   }
   }
@@ -454,7 +521,8 @@ auto TargetCodeGen::visit(const koopa_raw_call_t &call) -> void {
       // Args 9+ go onto the stack at the very bottom of the current frame.
       load_to(param, "t0");
       int offset = (i - 8) * 4;
-      buffer += fmt::format("  sw t0, {}(sp)\n", offset);
+      emitSw(buffer, "t0", "sp", offset);
+      // buffer += fmt::format("  sw t0, {}(sp)\n", offset);
     }
     ++i;
   }
@@ -462,24 +530,61 @@ auto TargetCodeGen::visit(const koopa_raw_call_t &call) -> void {
   buffer += fmt::format("  call {}\n", call.callee->name + 1);
 }
 
-auto TargetCodeGen::visit(const koopa_raw_func_arg_ref_t &) -> void {}
-
 /**
  * @brief Handles global variable allocation.
  */
 auto TargetCodeGen::visit(const koopa_raw_global_alloc_t &global_alloc)
     -> void {
-  if (global_alloc.init->kind.tag == KOOPA_RVT_ZERO_INIT) {
-    // Uninitialized/Zero-initialized global.
-    buffer += "  .zero 4\n";
-  } else if (global_alloc.init->kind.tag == KOOPA_RVT_INTEGER) {
-    // Constant-initialized global.
-    buffer +=
-        fmt::format("  .word {}\n", global_alloc.init->kind.data.integer.value);
-  } else if (global_alloc.init->kind.tag == KOOPA_RVT_AGGREGATE) {
-    /* TODO: Implement aggregate (array) initialization */
-  }
+  [&](this auto &&self, koopa_raw_value_t value) -> void {
+    const auto &kind = value->kind;
+    switch (kind.tag) {
+    case KOOPA_RVT_INTEGER: {
+      buffer += fmt::format("  .word {}\n", kind.data.integer.value);
+      break;
+    }
+
+    case KOOPA_RVT_ZERO_INIT: {
+      buffer += fmt::format("  .zero {}\n", get_type_size(value->ty));
+      break;
+    }
+
+    case KOOPA_RVT_AGGREGATE: {
+      for (const auto &sub_val :
+           make_span<koopa_raw_value_t>(kind.data.aggregate.elems)) {
+        self(sub_val);
+      }
+      break;
+    }
+
+    default: assert(false);
+    }
+  }(global_alloc.init);
 }
+
+auto TargetCodeGen::visit(const koopa_raw_get_elem_ptr_t &get_elem_ptr)
+    -> void {
+  load_to(get_elem_ptr.src, "t0");
+  load_to(get_elem_ptr.index, "t1");
+
+  auto stride =
+      get_type_size(get_elem_ptr.src->ty->data.pointer.base->data.array.base);
+
+  buffer += fmt::format("  li t2, {}\n", stride);
+  buffer += "  mul t1, t1, t2\n";
+  buffer += "  add t0, t0, t1\n";
+};
+
+auto TargetCodeGen::visit(const koopa_raw_get_ptr_t &get_ptr) -> void {
+
+  load_to(get_ptr.src, "t0");
+  load_to(get_ptr.index, "t1");
+
+  auto stride = get_type_size(get_ptr.src->ty->data.pointer.base);
+
+  buffer += fmt::format("  li t2, {}\n", stride);
+  buffer += "  mul t1, t1, t2\n";
+  buffer += "  add t0, t0, t1\n";
+};
 
 /**
  * @brief Generates assembly for binary operations.
@@ -531,5 +636,3 @@ auto TargetCodeGen::visit(const koopa_raw_binary_t &binary) -> void {
   }
   // clang-format on
 }
-
-auto TargetCodeGen::visit(const koopa_raw_integer_t &) -> void {}

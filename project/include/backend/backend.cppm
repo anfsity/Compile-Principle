@@ -81,14 +81,14 @@ private:
    */
   auto visit(const koopa_raw_return_t &ret) -> void;
   auto visit(const koopa_raw_binary_t &binary) -> void;
-  auto visit(const koopa_raw_integer_t &integer) -> void;
   auto visit(const koopa_raw_jump_t &jump) -> void;
   auto visit(const koopa_raw_branch_t &branch) -> void;
   auto visit(const koopa_raw_load_t &load) -> void;
   auto visit(const koopa_raw_store_t &store) -> void;
   auto visit(const koopa_raw_call_t &call) -> void;
-  auto visit(const koopa_raw_func_arg_ref_t &func_arg_ref) -> void;
   auto visit(const koopa_raw_global_alloc_t &global_alloc) -> void;
+  auto visit(const koopa_raw_get_elem_ptr_t &get_elem_ptr) -> void;
+  auto visit(const koopa_raw_get_ptr_t &get_ptr) -> void;
   /** @} */
 };
 } // namespace backend
