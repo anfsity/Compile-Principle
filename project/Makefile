@@ -8,7 +8,7 @@ PWD := $(shell pwd)
 all: build
 
 config:
-	cmake -S . -B cmake-build -G Ninja -DCMAKE_CXX_COMPILER=clang++
+	cmake -S . -B $(BUILD_DIR) -G Ninja -DCMAKE_CXX_COMPILER=clang++
 
 build: config
 	cmake --build $(BUILD_DIR) -j12
