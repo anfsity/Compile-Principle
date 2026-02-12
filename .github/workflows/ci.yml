@@ -17,19 +17,6 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v5
       - name: test koopa
-        run: |
-          autotest -w debug -koopa -s lv1 .
-          autotest -w debug -koopa -s lv3 .
-          autotest -w debug -koopa -s lv4 .
-          autotest -w debug -koopa -s lv5 .
-          autotest -w debug -koopa -s lv6 .
-          autotest -w debug -koopa -s lv7 .
-          autotest -w debug -koopa -s lv8 .
+        run: autotest -w debug -koopa .
       - name: test riscv
-        run: |
-          autotest -w debug -riscv -s lv1 .
-          autotest -w debug -riscv -s lv3 .
-          autotest -w debug -riscv -s lv4 .
-          autotest -w debug -riscv -s lv5 .
-          autotest -w debug -riscv -s lv6 .
-          autotest -w debug -riscv -s lv7 .
+        run: autotest -w debug -riscv .
