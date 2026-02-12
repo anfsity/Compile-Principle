@@ -1,22 +1,58 @@
 name: compiler auto test
 run-name: ${{ github.actor }} is testing out compiler function 🚀
+
 on:
   push:
+    paths:
+      - 'project/**'
   pull_request:
   workflow_dispatch:
-  
+
 jobs:
-  build:
+  build_compiler:
     runs-on: ubuntu-latest
     container:
       image: maxxing/compiler-dev
     defaults:
       run:
         working-directory: ./project
+    outputs:
+      artifact_name: compiler-binary
     steps:
-      - name: Check out repository code
-        uses: actions/checkout@v5
-      - name: test koopa
-        run: autotest -w debug -koopa .
-      - name: test riscv
-        run: autotest -w debug -riscv .
+      - uses: actions/checkout@v5
+      
+      - name: Install Ninja
+        run: |
+          wget https://github.com/ninja-build/ninja/releases/latest/download/ninja-linux.zip
+          unzip ninja-linux.zip -d /usr/local/bin/
+          
+      - name: Build Binary
+        run: make
+
+  test_compiler:
+    needs: build_compiler
+    runs-on: ubuntu-latest
+    container:
+      image: maxxing/compiler-dev
+    strategy:
+      fail-fast: false
+      matrix:
+        test_type: [koopa, riscv]
+    defaults:
+      run:
+        working-directory: ./project
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set Permission
+        run: chmod +x compiler
+
+      - name: Run Test
+        run: autotest -w debug -${{ matrix.test_type }} .
+
+      - name: Upload Test Logs
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: test-logs-${{ matrix.test_type }}
+          path: project/debug/
