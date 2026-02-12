@@ -117,6 +117,9 @@ public:
   auto toKoopa(ir::KoopaBuilder &builder) const -> std::string;
 };
 
+/**
+ * @brief Base class for definition AST nodes (variables, functions, arrays).
+ */
 class DefAST : public BaseAST {};
 
 /**
@@ -143,6 +146,11 @@ public:
   auto codeGen(ir::KoopaBuilder &builder) const -> std::string override;
 };
 
+/**
+ * @brief AST node for array definitions.
+ *
+ * Handles both constant and non-constant array definitions, including their sizes and initializers.
+ */
 class ArrayDefAST : public DefAST {
 public:
   ~ArrayDefAST() override;

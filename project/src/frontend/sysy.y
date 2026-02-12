@@ -155,8 +155,6 @@ FuncFParams
     $$->push_back(std::unique_ptr<FuncParamAST>(static_cast<FuncParamAST *>($3)));
   };
 
-// foo(int []) -> *i32
-// foo(int [][1]) -> **i32
 FuncFParam
   : Btype IDENT {
     $$ = new FuncParamAST(std::move(*$1), std::move(*$2), false, false, {});
@@ -210,15 +208,22 @@ BlockItemList
     $$->push_back(std::unique_ptr<BaseAST>($2));
   };
 
+/**
+ * @brief Block item (declaration or statement).
+ */
 BlockItem
   : Decl { $$ = $1; }
   | Stmt { $$ = $1; };
 
+/**
+ * @brief Declaration (constant or variable).
+ */
 Decl 
   : ConstDecl { $$ = $1; }
   | VarDecl   { $$ = $1; };
-
-ConstDecl
+/**
+ * @brief Constant declaration.
+ */ConstDecl
   : CONST Btype ConstDefList ';' {
     $$ = new DeclAST(true, std::move(*$2), std::move(*$3));
     delete $2;
@@ -236,6 +241,9 @@ ConstDefList
     $$->push_back(std::unique_ptr<DefAST>(static_cast<DefAST *>($3)));
   };
 
+/**
+ * @brief Constant definition.
+ */
 ConstDef 
   : IDENT '=' Expr {
     // @param is_const, ident, exprAST
@@ -248,11 +256,9 @@ ConstDef
     delete $2;
   };
 
-/* 
-ConstDef      ::= IDENT {"[" ConstExp "]"} "=" ConstInitVal;
-ConstInitVal  ::= ConstExp | "{" [ConstInitVal {"," ConstInitVal}] "}";
-*/
-
+/**
+ * @brief Array dimension suffix (e.g. `[2][3]`).
+ */
 ArraySuffix
   : '[' Expr ']' {
     $$ = new std::vector<std::unique_ptr<ExprAST>>();
@@ -274,6 +280,9 @@ InitializeList
   };
 
 // {1, 2, {2, 0}}
+/**
+ * @brief Initializer value (expression or initializer list).
+ */
 InitVal
   : Expr {
     $$ = new InitValStmtAST($1, {});
@@ -287,12 +296,9 @@ InitVal
     delete $2;
   };
 
-/*
-Initialize list
-ConstDef      ::= IDENT ["[" ConstExp "]"] "=" ConstInitVal;
-ConstInitVal  ::= ConstExp | "{" [ConstExp {"," ConstExp}] "}";
-*/
-
+/**
+ * @brief Variable declaration.
+ */
 VarDecl
   : Btype VarDefList ';' {
     $$ = new DeclAST(false, std::move(*$1), std::move(*$2));
@@ -310,6 +316,9 @@ VarDefList
     $$->push_back(std::unique_ptr<DefAST>(static_cast<DefAST *>($3)));
   };
 
+/**
+ * @brief Variable definition (with optional initialization).
+ */
 VarDef 
   : IDENT '=' Expr {
     $$ = new ScalarDefAST(false, std::move(*$1), $3);
@@ -447,11 +456,17 @@ Expr
     $$ = new BinaryExprAST(BinaryOp::Or, $1, $3);
   };
 
+/**
+ * @brief Integer constant wrapper.
+ */
 Number
   : INT_CONST {
     $$ = new NumberAST($1);
   };
 
+/**
+ * @brief Left-value expression (variable / array access).
+ */
 LVal 
   : IDENT {
     $$ = new LValAST(std::move(*$1), {});

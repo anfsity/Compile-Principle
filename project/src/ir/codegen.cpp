@@ -96,6 +96,10 @@ auto FuncParamAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   return "";
 }
 
+/**
+ * @brief Converts function parameter type to Koopa IR string.
+ * @return The Koopa type string (e.g., `i32` or `*i32`).
+ */
 auto FuncParamAST::toKoopa(ir::KoopaBuilder &builder) const -> std::string {
   std::shared_ptr<type::Type> param_type;
 
@@ -190,6 +194,20 @@ auto FuncDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   return "";
 }
 
+/**
+ * @brief Generates IR for an array definition (global or local).
+ *
+ * Handles:
+ * 1. Type Construction: Recursively builds the multidimensional array type.
+ * 2. IR String Generation: Format string for the array type (e.g., `[[i32, 2], 3]`).
+ * 3. Allocation:
+ *    - Global: Allocates in `.data` section, handles initialization.
+ *    - Local: Allocates on stack, handles initialization via `getelemptr` and `store`.
+ * 4. Initialization: Flattens the initializer list and fills the array.
+ *
+ * @param builder The IR builder context.
+ * @return An empty string.
+ */
 auto ArrayDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   std::shared_ptr<type::Type> arr_type = type::IntType::get();
   for (const auto &dim : array_suffix | reverse) {
@@ -282,7 +300,7 @@ auto ArrayDefAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
  * - Globals: Allocated in the global space, possibly with an initializer.
  * - Locals: Allocated on the stack using 'alloc'. Constants are tracked in the
  *   symbol table but don't result in 'alloc' instructions unless they are
- * non-const.
+ *   non-const.
  *
  * @param builder The IR builder context.
  * @return An empty string.
@@ -379,6 +397,12 @@ auto ExprStmtAST::codeGen(ir::KoopaBuilder &builder) const -> std::string {
   return "";
 }
 
+/**
+ * @brief Dummy code generation method for initializer lists.
+ *
+ * Helper node `InitValStmtAST` is only used during initialization flattening.
+ * Calling this method is a logical error.
+ */
 auto InitValStmtAST::codeGen([[maybe_unused]] ir::KoopaBuilder &builder) const
     -> std::string {
   //! No node should call `InitValStmtAST`'s `codeGen` function, as it is only

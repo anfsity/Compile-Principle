@@ -136,6 +136,13 @@ template <typename ptrType> auto make_span(const koopa_raw_slice_t &slice) {
       reinterpret_cast<const ptrType *>(slice.buffer), slice.len);
 }
 
+
+/**
+ * @brief Calculates the size (in bytes) of a given Koopa type.
+ *
+ * @param ty The Koopa type to measure.
+ * @return u_int32_t The size in bytes. Returns 0 for unknown types.
+ */
 auto get_type_size(koopa_raw_type_t ty) -> u_int32_t {
   switch (ty->tag) {
 
@@ -149,8 +156,28 @@ auto get_type_size(koopa_raw_type_t ty) -> u_int32_t {
   }
 }
 
+/**
+ * @brief Checks if an integer value fits within a 12-bit signed range.
+ *
+ * RISC-V immediate values for many instructions (like ADDI, LW, SW) are
+ * 12-bit signed integers [-2048, 2047].
+ *
+ * @param val The value to check.
+ * @return true if -2048 <= val <= 2047, false otherwise.
+ */
 auto isIn12BitRange(int val) -> bool { return val >= -2048 && val <= 2047; }
 
+/**
+ * @brief Emits a RISC-V `addi` instruction (or equivalent sequence).
+ *
+ * If `imm` fits in 12 bits, emits a single `addi`.
+ * Otherwise, loads `imm` into a temporary register and adds it.
+ *
+ * @param buffer The output assembly buffer.
+ * @param rd Destination register.
+ * @param rs Source register.
+ * @param imm Immediate value to add.
+ */
 auto emitAddi(std::string &buffer, std::string_view rd, std::string_view rs,
               int imm) -> void {
   if (isIn12BitRange(imm)) {
@@ -161,6 +188,16 @@ auto emitAddi(std::string &buffer, std::string_view rd, std::string_view rs,
   }
 }
 
+/**
+ * @brief Emits a RISC-V `lw` instruction (or equivalent sequence).
+ *
+ * Handles large offsets by calculating the address in a temporary register first.
+ *
+ * @param buffer The output assembly buffer.
+ * @param rd Destination register.
+ * @param rs Base address register.
+ * @param offset Byte offset from base.
+ */
 auto emitLw(std::string &buffer, std::string_view rd, std::string_view rs,
             int offset) -> void {
   if (isIn12BitRange(offset)) {
@@ -172,6 +209,16 @@ auto emitLw(std::string &buffer, std::string_view rd, std::string_view rs,
   }
 }
 
+/**
+ * @brief Emits a RISC-V `sw` instruction (or equivalent sequence).
+ *
+ * Handles large offsets by calculating the address in a temporary register first.
+ *
+ * @param buffer The output assembly buffer.
+ * @param src Source register (value to store).
+ * @param base Base address register.
+ * @param offset Byte offset from base.
+ */
 auto emitSw(std::string &buffer, std::string_view src, std::string_view base,
             int offset) -> void {
   if (isIn12BitRange(offset)) {
@@ -188,6 +235,14 @@ auto emitSw(std::string &buffer, std::string_view src, std::string_view base,
 using namespace backend;
 using namespace std::views;
 
+/**
+ * @brief Entry point for code generation.
+ *
+ * Traverses the `program`'s global values and function definitions,
+ * generating code for each. All output is appended to the internal `buffer`.
+ *
+ * @param program The root node of the Koopa IR.
+ */
 auto TargetCodeGen::visit(const koopa_raw_program_t &program) -> void {
   for (const auto value : make_span<koopa_raw_value_t>(program.values)) {
     visit(value);
@@ -291,6 +346,14 @@ auto TargetCodeGen::visit(koopa_raw_function_t func) -> void {
   }
 }
 
+
+/**
+ * @brief Generates assembly for a basic block.
+ *
+ * Emits the block label (if any) and visits all instructions in the block sequentially.
+ *
+ * @param bb The Koopa basic block to process.
+ */
 auto TargetCodeGen::visit(koopa_raw_basic_block_t bb) -> void {
   if (bb->name) {
     buffer += fmt::format("{}:\n", bb->name + 1);
@@ -403,6 +466,12 @@ auto TargetCodeGen::visit(koopa_raw_value_t value) -> void {
   }
 }
 
+
+/**
+ * @brief Generates assembly for a conditional branch.
+ *
+ * @param branch The Koopa branch instruction data.
+ */
 auto TargetCodeGen::visit(const koopa_raw_branch_t &branch) -> void {
   load_to(branch.cond, "t0");
   // bnez: branch if not equal to zero.
@@ -410,17 +479,37 @@ auto TargetCodeGen::visit(const koopa_raw_branch_t &branch) -> void {
   buffer += fmt::format("  j {}\n", branch.false_bb->name + 1);
 }
 
+/**
+ * @brief Generates assembly for an unconditional jump.
+ *
+ * @param jump The Koopa jump instruction data.
+ */
 auto TargetCodeGen::visit(const koopa_raw_jump_t &jump) -> void {
   std::string target_name = jump.target->name + 1;
   buffer += fmt::format("  j {}\n", target_name);
 }
 
+/**
+ * @brief Generates assembly for a load instruction.
+ *
+ * Loads a value from the memory address specified by `load.src`.
+ * The result is stored into `t0`, which will be saved to the stack by the caller.
+ *
+ * @param load The Koopa load instruction data.
+ */
 auto TargetCodeGen::visit(const koopa_raw_load_t &load) -> void {
   // src is a pointer value (either a local alloc or a global).
   load_to(load.src, "t0");
   buffer += "  lw t0, 0(t0)\n";
 }
 
+/**
+ * @brief Generates assembly for a store instruction.
+ *
+ * Stores the value in `store.value` to the memory address `store.dest`.
+ *
+ * @param store The Koopa store instruction data.
+ */
 auto TargetCodeGen::visit(const koopa_raw_store_t &store) -> void {
   load_to(store.value, "t0");
   load_to(store.dest, "t1");
@@ -532,6 +621,11 @@ auto TargetCodeGen::visit(const koopa_raw_call_t &call) -> void {
 
 /**
  * @brief Handles global variable allocation.
+ *
+ * Emits `.data` section directives for global variables.
+ * Recursively handles aggregate types (arrays) using a lambda.
+ *
+ * @param global_alloc The global allocation instruction data.
  */
 auto TargetCodeGen::visit(const koopa_raw_global_alloc_t &global_alloc)
     -> void {
@@ -561,6 +655,15 @@ auto TargetCodeGen::visit(const koopa_raw_global_alloc_t &global_alloc)
   }(global_alloc.init);
 }
 
+/**
+ * @brief Generates assembly for `getelementptr` (array element access).
+ *
+ * Compute address of `src[index]`.
+ * `src` is expected to be a pointer to an array (e.g., `[[i32, 10], 5]*`).
+ * The stride is the size of the array's element type.
+ *
+ * @param get_elem_ptr The Koopa GEP instruction data.
+ */
 auto TargetCodeGen::visit(const koopa_raw_get_elem_ptr_t &get_elem_ptr)
     -> void {
   load_to(get_elem_ptr.src, "t0");
@@ -574,6 +677,15 @@ auto TargetCodeGen::visit(const koopa_raw_get_elem_ptr_t &get_elem_ptr)
   buffer += "  add t0, t0, t1\n";
 };
 
+/**
+ * @brief Generates assembly for `getptr` (pointer arithmetic).
+ *
+ * Compute address of `src + index`.
+ * `src` is a pointer (e.g., `i32*`).
+ * The stride is the size of the type pointed to.
+ *
+ * @param get_ptr The Koopa getptr instruction data.
+ */
 auto TargetCodeGen::visit(const koopa_raw_get_ptr_t &get_ptr) -> void {
 
   load_to(get_ptr.src, "t0");

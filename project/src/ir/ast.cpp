@@ -51,6 +51,13 @@ AssignStmtAST::AssignStmtAST(BaseAST *_lval, BaseAST *_expr) {
   }
 }
 
+/**
+ * @brief Constructs an ArrayDefAST node.
+ * @param _is_const Whether the array is constant.
+ * @param _ident Array identifier name.
+ * @param _array_suffix List of expressions defining array dimensions.
+ * @param _init_val Optional initialization value(s).
+ */
 ArrayDefAST::ArrayDefAST(bool _is_const, std::string _ident,
                          std::vector<std::unique_ptr<ExprAST>> _array_suffix,
                          InitValStmtAST *_init_val)
@@ -91,7 +98,10 @@ auto FuncDefAST::dump(int depth) const -> void {
   }
 }
 
-// TODO: add number
+/**
+ * @brief Dumps ArrayDefAST node details.
+ * @param depth Indentation depth.
+ */
 auto ArrayDefAST::dump(int depth) const -> void {
   fmt::println("{}ArrayDefAST: {}", indent(depth), ident);
 }
@@ -129,6 +139,10 @@ auto ExprStmtAST::dump(int depth) const -> void {
   }
 }
 
+/**
+ * @brief Dumps InitValStmtAST node details.
+ * @param depth Indentation depth.
+ */
 auto InitValStmtAST::dump(int depth) const -> void {
   fmt::println("{}InitValStmtAST:", indent(depth));
   for (const auto &init_val : initialize_list) {
