@@ -44,9 +44,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Set Permission
-        run: chmod +x compiler
-
       - name: Run Test
         run: autotest -w debug -${{ matrix.test_type }} .
 
