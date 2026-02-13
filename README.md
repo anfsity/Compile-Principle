@@ -4,6 +4,7 @@
 ![Build](https://img.shields.io/badge/build-passing-brightgreen)
 ![Language](https://img.shields.io/badge/language-C%2B%2B-blue)
 ![Modules](https://img.shields.io/badge/modules-C%2B%2B20-blue?logo=c%2B%2B&logoColor=white)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/anfsity/Compile-Principle)
 
 A SysY compiler implementation targeting Koopa IR and RISC-V Assembly. Developed for the PKU Compile Principle Laboratory.
 
